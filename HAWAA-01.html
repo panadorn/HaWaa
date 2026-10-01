@@ -1,0 +1,2516 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+<meta charset="UTF-8">
+<title>HAWaa University</title>
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
+<link rel="stylesheet" href="https://unpkg.com/leaflet-draw@1.0.4/dist/leaflet.draw.css">
+<link href="https://fonts.googleapis.com/css2?family=Mali:wght@400;700&family=Charmonman:wght@400;700&family=Sriracha&family=Caveat:wght@400;700&family=Kalam:wght@400;700&family=Patrick+Hand&display=swap" rel="stylesheet">
+<style>
+  *{box-sizing:border-box;}
+  body{margin:0;font-family:'Segoe UI',Tahoma,sans-serif;display:flex;height:100vh;overflow:hidden;}
+  #sidebar{width:340px;background:#1f2937;color:#e5e7eb;overflow-y:auto;padding:14px;flex-shrink:0;transition:margin-left .25s ease;}
+  #sidebar.collapsed{margin-left:-340px;}
+  #sidebar h1{font-size:15px;margin:0 0 12px;color:#fff;}
+  #sidebar h3{font-size:12px;text-transform:uppercase;letter-spacing:.5px;color:#9ca3af;border-bottom:1px solid #374151;padding-bottom:4px;margin:16px 0 8px;}
+  #sidebar label{font-size:11.5px;display:block;margin-bottom:3px;color:#cbd5e1;}
+  #sidebar input, #sidebar select{width:100%;padding:5px;margin-bottom:6px;border-radius:5px;border:1px solid #4b5563;background:#111827;color:#fff;font-size:12px;}
+  #sidebar input[type=color]{padding:2px;height:32px;cursor:pointer;}
+  #sidebar button{cursor:pointer;border:none;border-radius:6px;padding:7px;font-size:11.5px;background:#374151;color:#fff;margin:2px 0;width:100%;text-align:left;transition:.15s;}
+  #sidebar button:hover{background:#4b5563;}
+  #sidebar button.active{background:#2563eb;}
+  #sidebar button:disabled{opacity:.4;cursor:not-allowed;}
+  #sidebar button:disabled:hover{background:#374151;}
+  .grid2{display:grid;grid-template-columns:1fr 1fr;gap:4px;}
+  .grid3{display:grid;grid-template-columns:1fr 1fr 1fr;gap:4px;}
+  .grid4{display:grid;grid-template-columns:repeat(7, 1fr);gap:4px;margin:4px 0 8px;}
+  .preset-btn{height:22px;border:none;border-radius:4px;cursor:pointer;padding:0;}
+  .preset-btn:hover{outline:2px solid #fff;outline-offset:1px;}
+  .row{display:flex;gap:6px;}
+  .row button{flex:1;}
+  #map-wrap{flex:1;position:relative;}
+  #map{width:100%;height:100%;background:#111;}
+  table{width:100%;border-collapse:collapse;font-size:10.5px;}
+  th,td{border:1px solid #4b5563;padding:3px 5px;color:#ffffff;vertical-align:middle;}
+  th{background:#111827;color:#f3f4f6;font-weight:600;}
+  td.chk-cell{text-align:center;}
+  td.chk-cell input{width:auto;margin:0;cursor:pointer;}
+  .map-overlay-north{position:absolute;top:10px;left:60px;z-index:500;background:rgba(255,255,255,.9);padding:4px 10px;border-radius:50%;text-align:center;font-size:11px;font-weight:bold;box-shadow:0 1px 4px rgba(0,0,0,.3);}
+  .map-text-label{padding:2px 8px;font-size:18px;font-weight:600;white-space:nowrap;}
+  .clean-text-icon{background:transparent !important;border:none !important;box-shadow:none !important;}
+  .rotator-inner{display:inline-block;transform-origin:center center;}
+  #lock-status{font-size:11px;color:#a7f3d0;min-height:14px;}
+  small.hint{color:#9ca3af;font-size:10.5px;display:block;margin-top:2px;}
+  .chk-row{display:flex;align-items:center;gap:6px;margin:6px 0;font-size:12px;color:#cbd5e1;}
+  .chk-row input{width:auto;margin:0;}
+  .scaled-tree-icon{position:absolute;overflow:visible;}
+  .scaled-tree-icon svg{display:block;width:100%;height:100%;overflow:visible;}
+  body.drawing-mode .scaled-tree-icon{ pointer-events:none; }
+  .measure-label{background:rgba(211,47,47,.92);color:#fff;padding:2px 7px;border-radius:4px;font-size:12px;font-weight:600;white-space:nowrap;border:1px solid #fff;}
+  #move-controls,#color-controls,#lineStyle-controls,#textSize-controls{display:none;background:#111827;border-radius:8px;padding:10px;margin-top:6px;}
+  #move-controls{border:1px solid #9333ea;}
+  #color-controls{border:1px solid #f59e0b;}
+  #lineStyle-controls{border:1px solid #7c3aed;}
+  #textSize-controls{border:1px solid #0ea5e9;}
+  #move-target-label,#color-target-label,#lineStyle-target-label,#textSize-target-label{font-size:12px;color:#93c5fd;margin-bottom:6px;}
+  #search-results{display:none;max-height:190px;overflow-y:auto;background:#111827;border:1px solid #4b5563;border-radius:6px;margin:-2px 0 8px;}
+  .search-result-item{padding:7px 9px;font-size:11.5px;color:#e5e7eb;cursor:pointer;border-bottom:1px solid #374151;}
+  .search-result-item:last-child{border-bottom:none;}
+  .search-result-item:hover{background:#374151;}
+  #coord-list-wrap{display:none;margin-top:6px;}
+  #traverse-controls{display:none;background:#111827;border:1px solid #06b6d4;border-radius:8px;padding:10px;margin-top:6px;}
+  #traverse-info{font-size:11px;color:#a7f3d0;margin:6px 0;}
+  #kml-layers-wrap{display:none;background:#111827;border:1px solid #f59e0b;border-radius:8px;padding:8px;margin-top:6px;}
+  .kml-item{display:flex;align-items:center;justify-content:space-between;gap:4px;padding:5px 0;border-bottom:1px solid #374151;font-size:11px;}
+  .kml-item:last-child{border-bottom:none;}
+  .kml-item-name{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:140px;}
+  .kml-actions{display:flex;gap:3px;flex-shrink:0;}
+  .kml-actions button{width:auto;padding:3px 6px;margin:0;font-size:11px;}
+  #btn-toggle-sidebar{position:absolute;top:10px;left:10px;z-index:1100;width:34px;height:34px;border-radius:6px;border:none;background:rgba(31,41,55,.85);color:#fff;font-size:16px;cursor:pointer;box-shadow:0 2px 6px rgba(0,0,0,.4);}
+  #btn-toggle-sidebar:hover{background:rgba(31,41,55,1);}
+  #basemap-switcher{position:absolute;top:10px;right:10px;z-index:600;display:flex;gap:4px;}
+  #basemap-switcher button{width:auto;margin:0;padding:5px 9px;font-size:10.5px;font-weight:600;background:rgba(31,41,55,.72);color:#fff;border-radius:5px;text-align:center;border:none;cursor:pointer;box-shadow:0 1px 4px rgba(0,0,0,.35);}
+  #basemap-switcher button.active{background:#2563eb;}
+  #basemap-switcher button:hover{background:rgba(31,41,55,.9);}
+  #basemap-switcher button.active:hover{background:#1d4ed8;}
+  .crosshair-line{position:absolute;pointer-events:none;z-index:2000;background:#ff1744;}
+  .crosshair-line.horizontal{height:1px;left:0;width:100%;}
+  .crosshair-line.vertical{width:1px;top:0;height:100%;}
+  #kml-modal{display:none;position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,0.6);z-index:3000;justify-content:center;align-items:center;}
+  #kml-modal-content{background:#1f2937;color:#e5e7eb;width:640px;max-width:92vw;max-height:82vh;border-radius:8px;padding:16px;display:flex;flex-direction:column;box-shadow:0 4px 20px rgba(0,0,0,0.5);}
+  #kml-modal-body{overflow-y:auto;flex:1;font-size:11.5px;line-height:1.6;background:#111827;padding:10px;border-radius:5px;border:1px solid #374151;white-space:pre;font-family:Consolas,monospace;}
+  #toast-container{position:fixed;bottom:20px;right:20px;z-index:9999;display:flex;flex-direction:column;gap:8px;pointer-events:none;}
+  .toast{padding:10px 16px;border-radius:6px;color:#fff;font-size:12px;font-weight:600;box-shadow:0 2px 8px rgba(0,0,0,.4);opacity:0;transform:translateY(10px);transition:all .3s ease;pointer-events:auto;}
+  .toast.show{opacity:1;transform:translateY(0);}
+  .toast.success{background:#059669;}
+  .toast.error{background:#dc2626;}
+  .toast.info{background:#2563eb;}
+  .boq-section-row td{background:#374151 !important;color:#fbbf24 !important;font-weight:700;font-size:10.5px;padding:4px 6px !important;}
+</style>
+</head>
+<body>
+
+<svg width="0" height="0" style="position:absolute">
+  <defs>
+    <pattern id="hatchGreen" width="6" height="6" patternTransform="rotate(45)" patternUnits="userSpaceOnUse">
+      <line x1="0" y1="0" x2="0" y2="6" stroke="#0f3319" stroke-width="1.5" opacity="0.55"/>
+    </pattern>
+    <pattern id="hatchGreenCross" width="5" height="5" patternTransform="rotate(-20)" patternUnits="userSpaceOnUse">
+      <line x1="0" y1="0" x2="0" y2="5" stroke="#1b4d2e" stroke-width="1.1" opacity="0.5"/>
+    </pattern>
+    <radialGradient id="treeShadowGrad" cx="50%" cy="50%" r="50%">
+      <stop offset="0%" stop-color="#000000" stop-opacity="0.60"/>
+      <stop offset="55%" stop-color="#000000" stop-opacity="0.42"/>
+      <stop offset="100%" stop-color="#000000" stop-opacity="0"/>
+    </radialGradient>
+  </defs>
+</svg>
+
+<div id="toast-container"></div>
+
+<div id="sidebar">
+  <h1>🌿 HAWaa Gis@Landscape Studio</h1>
+
+  <h3>🔍 ค้นหาสถานที่</h3>
+  <div class="row">
+    <input id="inp-search-place" placeholder="พิมพ์ชื่อสถานที่ เช่น วัดพระธาตุดอยสุเทพ" style="flex:1">
+    <button id="btn-search-place" style="width:auto;flex:0 0 40px;text-align:center;background:#0891b2;">🔍</button>
+  </div>
+  <div id="search-results"></div>
+  <small class="hint">ค้นหาแล้วคลิกผลลัพธ์เพื่อไปยังตำแหน่งนั้น</small>
+
+  <h3>💾 เปิด / บันทึกผัง (JSON)</h3>
+  <label>เปิดไฟล์ผังเดิม (.json)</label>
+  <input id="inp-load-json" type="file" accept=".json">
+  <button id="btn-save-json" style="margin-top:6px;">💾 บันทึกเป็น JSON</button>
+
+  <h3>📥 นำเข้าไฟล์ KML และจัดการเลเยอร์</h3>
+  <input id="inp-kml-file" type="file" accept=".kml">
+  <small class="hint">แยกเลเยอร์อิสระ เปิด/ปิดเฉพาะตัว แปลงเป็นขอบเขต หรือออกรายงานพิกัด UTM 47N พร้อมไฟล์ .txt ได้ทีละรายการ</small>
+  <div id="kml-layers-wrap">
+    <div style="font-weight:700;margin-bottom:4px;color:#fde047;font-size:11.5px;">📂 รายการเลเยอร์ KML</div>
+    <div id="kml-layers-list"></div>
+  </div>
+
+  <h3>🖼️ นำเข้าภาพภายนอก</h3>
+  <input id="inp-image-file" type="file" accept="image/*">
+  <div id="image-controls" style="display:none;">
+    <div class="chk-row"><input type="checkbox" id="chk-image-visible" checked> 👁️ แสดงภาพนี้บนแผนที่</div>
+    <label>🔆 ความโปร่งใสภาพ</label>
+    <input id="inp-opacity" type="range" min="10" max="100" value="85">
+    <label>หมุนภาพ (±180°)</label>
+    <input id="inp-rotate" type="range" min="-180" max="180" value="0">
+    <small class="hint">ลาก = ย้ายภาพ | Shift+ลาก = ย่อ/ขยาย</small>
+    <div class="row" style="margin-top:6px;">
+      <button id="btn-image-to-front" style="background:#0369a1;">🔝 ภาพอยู่ด้านบน</button>
+      <button id="btn-image-to-back" style="background:#52525b;">⬇️ ภาพอยู่ด้านหลัง</button>
+    </div>
+    <button id="btn-calibrate">📏 Calibrate (คลิก 2 จุดบนภาพ)</button>
+    <div class="chk-row"><input type="checkbox" id="chk-image-locked"> 🔒 ล็อกภาพ (ป้องกันการลากพลาด)</div>
+    <div id="lock-status"></div>
+  </div>
+
+  <!-- [ลำดับ 5] สัญลักษณ์ต้นไม้ -->
+  <h3>🌳 สัญลักษณ์ต้นไม้</h3>
+  <div class="row">
+    <div style="flex:1"><label>ทรงพุ่มไม้ใหญ่ (ม.)</label><input id="inp-tree-dia" type="number" step="0.5" value="8"></div>
+    <div style="flex:1"><label>ทรงพุ่มปาล์ม (ม.)</label><input id="inp-palm-dia" type="number" step="0.5" value="4.5"></div>
+  </div>
+  <div class="row">
+    <div style="flex:1"><label>ทรงพุ่มไม้พุ่มกลาง (ม.)</label><input id="inp-shrub-dia" type="number" step="0.25" value="4.5"></div>
+    <div style="flex:1"><label>ทรงพุ่มไม้พุ่มใหญ่ (ม.)</label><input id="inp-large-shrub-dia" type="number" step="0.25" value="6"></div>
+  </div>
+  <div class="grid2">
+    <button id="btn-tree">🌳 ต้นไม้ใหญ่</button>
+    <button id="btn-palm">🌴 ปาล์ม</button>
+    <button id="btn-shrub-mid">🌿 ไม้พุ่มกลาง</button>
+    <button id="btn-large-shrub">🌿 ไม้พุ่มใหญ่</button>
+  </div>
+  <small class="hint">กด Esc เพื่อออกจากโหมดวาง</small>
+
+  <!-- [ลำดับ 6 - ย้ายขึ้น] พื้นที่/แปลง - ย้ายมาอยู่ถัดจากสัญลักษณ์ต้นไม้ -->
+  <h3>◼️ พื้นที่/แปลง</h3>
+  <div class="grid2">
+    <button id="btn-shrub-group">🌳 กลุ่มไม้พุ่ม</button>
+    <button id="btn-planting">🌱 แปลงปลูก</button>
+    <button id="btn-lawn">🟩 สนามหญ้า</button>
+    <button id="btn-gravel">🪨 ลานกรวดหิน</button>
+    <button id="btn-water">💧 น้ำ</button>
+    <button id="btn-hardscape">◻️ ลานพื้นแข็ง</button>
+    <button id="btn-deck">🪵 เดคไม้</button>
+    <button id="btn-building">🏠 อาคาร</button>
+  </div>
+
+  <!-- [ลำดับ 7] เส้น/ทาง -->
+  <h3>➰ เส้น/ทาง (สเกลจริง)</h3>
+  <div class="row">
+    <div style="flex:1"><label>กว้างถนน (ม.)</label><input id="inp-road-width" type="number" step="0.1" value="4"></div>
+    <div style="flex:1"><label>กว้างทางเดิน (ม.)</label><input id="inp-path-width" type="number" step="0.1" value="2"></div>
+  </div>
+  <div class="grid2">
+    <button id="btn-path">🚶 ทางเดิน</button>
+    <button id="btn-road">🛣️ ถนน</button>
+  </div>
+
+  <!-- [ลำดับ 8] แนวรั้ว/ขอบเขต -->
+  <h3>🚧 แนวรั้ว / ขอบเขต</h3>
+  <label>ระยะห่างเสารั้ว (ม.)</label>
+  <input id="inp-fence-spacing" type="number" step="0.5" min="0.5" value="2">
+  <div class="grid2">
+    <button id="btn-fence">🚧 แนวรั้ว</button>
+    <button id="btn-boundary">📐 ขอบเขตพื้นที่</button>
+  </div>
+
+  <h3>✏️ เครื่องมือทั่วไป</h3>
+  <div class="row" style="margin-bottom:6px;">
+    <button id="btn-undo">↩️ Undo (Ctrl+Z)</button>
+    <button id="btn-redo">↪️ Redo (Ctrl+Y)</button>
+  </div>
+  <div class="grid2">
+    <button id="btn-pan" style="background:#2563eb;">🖐️ Pan</button>
+    <button id="btn-move" style="background:#9333ea;">↔️ ย้าย/หมุนวัตถุ</button>
+    <button id="btn-color" style="background:#f59e0b;">🎨 เปลี่ยนสีวัตถุ</button>
+    <button id="btn-shape-edit" style="background:#dc2626;">🔧 แก้ไขรูปร่าง</button>
+    <button id="btn-text-edit" style="background:#0ea5e9;">📝 แก้ไขข้อความ</button>
+    <button id="btn-text-size" style="background:#2563eb;">🔤 ปรับขนาดตัวอักษร</button>
+    <button id="btn-line-style" style="background:#7c3aed;">📏 ปรับเส้น (ขนาด/โปร่งใส)</button>
+    <button id="btn-arrow" style="background:#e11d48;">➡️ ลูกศรชี้ทิศทาง</button>
+    <button id="btn-free-line" style="background:#334155;">➖ เส้นโพลีไลน์</button>
+    <button id="btn-measure-line">📏 วัดระยะทาง</button>
+    <button id="btn-measure-area">📐 วัดพื้นที่</button>
+    <button id="btn-free-polygon">⬠ โพลีกอนอิสระ</button>
+  </div>
+  <small class="hint">💡 ระหว่างวาดเส้น/พื้นที่ ยังลากเมาส์ปุ่มซ้ายเพื่อเลื่อนแผนที่ได้</small>
+
+  <div id="move-controls">
+    <div id="move-target-label">ยังไม่ได้เลือกวัตถุ</div>
+    <small class="hint">คลิกวัตถุแล้วลากเพื่อย้าย / ใช้สไลเดอร์เพื่อหมุน</small>
+    <label>หมุนวัตถุที่เลือก (°)</label>
+    <input id="inp-object-rotate" type="range" min="-180" max="180" value="0">
+    <button id="btn-deselect-move">✖️ เลิกเลือกวัตถุ</button>
+  </div>
+
+  <div id="color-controls">
+    <div id="color-target-label">ยังไม่ได้เลือกวัตถุ</div>
+    <div id="color-fill-row">
+      <label id="color-fill-label">สี</label>
+      <div class="grid4" id="fill-presets"></div>
+      <input id="inp-color-fill" type="color" value="#4caf50">
+    </div>
+    <div id="color-stroke-row">
+      <label id="color-stroke-label">สีเส้นขอบ</label>
+      <div class="grid4" id="stroke-presets"></div>
+      <input id="inp-color-stroke" type="color" value="#000000">
+    </div>
+    <button id="btn-deselect-color">✖️ เลิกเลือกวัตถุ</button>
+  </div>
+
+  <div id="lineStyle-controls">
+    <div id="lineStyle-target-label">ยังไม่ได้เลือกเส้น</div>
+    <label>ความหนาเส้น (px)</label>
+    <input id="inp-line-weight" type="range" min="1" max="20" value="3">
+    <label>ความโปร่งใส (%)</label>
+    <input id="inp-line-opacity" type="range" min="10" max="100" value="100">
+    <button id="btn-deselect-line-style">✖️ เลิกเลือกเส้น</button>
+  </div>
+
+  <div id="textSize-controls">
+    <div id="textSize-target-label">ยังไม่ได้เลือกข้อความ</div>
+    <label>ขนาดตัวอักษร (px)</label>
+    <input id="inp-text-size" type="range" min="12" max="60" value="18">
+    <button id="btn-deselect-text-size">✖️ เลิกเลือกข้อความ</button>
+  </div>
+
+  <small class="hint" id="shape-edit-hint" style="display:none;">🔧 คลิกวัตถุเพื่อแสดงจุดจับสำหรับแก้ไขรูปร่าง คลิกซ้ำเพื่อปิด</small>
+  <small class="hint" id="text-edit-hint" style="display:none;">📝 คลิกป้ายข้อความที่วางไว้แล้วเพื่อแก้ไขคำใหม่</small>
+
+  <div class="row" style="margin-top:10px;">
+    <div style="flex:1">
+      <label>🖋️ ฟอนต์ข้อความ (ลายมือ)</label>
+      <select id="inp-font-select">
+        <option value="'Mali', cursive">Mali (ไทย)</option>
+        <option value="'Charmonman', cursive">Charmonman (ไทย)</option>
+        <option value="'Sriracha', cursive">Sriracha (ไทย)</option>
+        <option value="'Caveat', cursive">Caveat (Eng)</option>
+        <option value="'Kalam', cursive">Kalam (Eng)</option>
+        <option value="'Patrick Hand', cursive">Patrick Hand (Eng)</option>
+        <option value="'Segoe UI', sans-serif">ตัวพิมพ์ปกติ</option>
+      </select>
+    </div>
+  </div>
+  <div class="grid2">
+    <button id="btn-text">🔤 ข้อความ</button>
+    <button id="btn-pen">✒️ ปากกาสเก็ตช์</button>
+  </div>
+  <div class="grid2">
+    <button id="btn-eraser">🧹 ยางลบ</button>
+    <button id="btn-clear-all" style="background:#7f1d1d;">🗑️ ล้างทั้งหมด</button>
+  </div>
+
+  <h3>🏷️ ชื่อโครงการ (ใช้ตอน Export)</h3>
+  <input id="inp-title" value="ผังหลักโครงการ (Master Plan)">
+
+  <h3>📊 ตาราง BOQ (ติ๊ก = แสดงบนแผนที่)</h3>
+  <table><thead><tr><th style="width:34px;">แสดง</th><th>#</th><th>รายการ</th><th>ปริมาณ</th><th>หน่วย</th></tr></thead>
+  <tbody id="boq-body"><tr><td colspan="5" style="text-align:center;color:#888">ยังไม่มีข้อมูล</td></tr></tbody></table>
+  <button id="btn-download-boq" style="background:#065f46;margin-top:6px;">📥 ดาวน์โหลด BOQ (.txt)</button>
+
+  <h3>📤 ส่งออกไฟล์</h3>
+  <button id="btn-export-png" style="background:#0891b2;">🖼️ ดาวน์โหลดภาพ HD (PNG)</button>
+  <button id="btn-export-pdf" style="background:#7c3aed;">📄 ส่งออก PDF (ผัง+BOQ)</button>
+
+  <h3>🧭 ตรวจสอบพิกัดจุดเดียว (UTM WGS84 Zone 47N)</h3>
+  <small class="hint">เปิดโหมดนี้แล้วคลิกบนแผนที่ — บันทึกทันทีพร้อมเลขลำดับ ยกเลิกจุดล่าสุดได้</small>
+  <label>หมายเหตุ (เช่น ชื่อพันธุ์ไม้) สำหรับจุดถัดไป</label>
+  <input id="inp-coord-note" type="text" placeholder="เช่น มะม่วง, ก้ามปู, ประดู่">
+  <button id="btn-coord-check" style="background:#0d9488;">✛ เปิดโหมดตรวจสอบพิกัด</button>
+  <div id="coord-list-wrap">
+    <div class="row">
+      <button id="btn-undo-coord">↩️ ยกเลิกจุดล่าสุด</button>
+      <button id="btn-clear-coord" style="background:#7f1d1d;">🗑️ ล้างทั้งหมด</button>
+    </div>
+    <table><thead><tr><th>#</th><th>Easting</th><th>Northing</th><th>หมายเหตุ</th><th></th></tr></thead>
+    <tbody id="coord-list-body"></tbody></table>
+    <button id="btn-download-coord-csv" style="background:#065f46;margin-top:4px;">📥 ดาวน์โหลด CSV (E,N,หมายเหตุ)</button>
+  </div>
+
+  <h3>▱ วงรอบพิกัด (Traverse Polygon)</h3>
+  <small class="hint">คลิกต่อเนื่องเพื่อสร้างวงรอบ แปลงเป็นขอบเขตพื้นที่ออกแบบได้ทันทีเมื่อจบวงรอบ</small>
+  <button id="btn-traverse-mode" style="background:#0891b2;">▱ เริ่ม/หยุด โหมดวงรอบ</button>
+  <div id="traverse-controls">
+    <div class="row">
+      <button id="btn-undo-traverse">↩️ ยกเลิกจุดล่าสุด</button>
+      <button id="btn-finish-traverse" style="background:#059669;">✅ จบวงรอบ</button>
+    </div>
+    <div id="traverse-info">จำนวนจุด: 0</div>
+    <table><thead><tr><th>#</th><th>Easting</th><th>Northing</th></tr></thead>
+    <tbody id="traverse-table-body"></tbody></table>
+    <div class="row" style="margin-top:6px;">
+      <button id="btn-download-traverse-csv" style="background:#065f46;">📥 CSV</button>
+      <button id="btn-export-traverse-kml" style="background:#7c3aed;">📥 KML</button>
+    </div>
+    <button id="btn-traverse-to-boundary" style="display:none;background:#b91c1c;margin-top:4px;">➕ แปลงวงรอบเป็นขอบเขตพื้นที่ออกแบบ</button>
+    <button id="btn-clear-traverse" style="background:#7f1d1d;margin-top:4px;">🗑️ ล้างวงรอบทั้งหมด</button>
+  </div>
+</div>
+
+<div id="map-wrap">
+  <button id="btn-toggle-sidebar" title="ซ่อน/แสดงเมนู">✕</button>
+  <div id="map">
+    <div class="map-overlay-north">N<br>↑</div>
+    <!-- [FIX] ลบ basemap white ออก คงเฉพาะ sat + topo -->
+    <div id="basemap-switcher">
+      <button id="btn-basemap-sat" class="active">🛰️ ดาวเทียม</button>
+      <button id="btn-basemap-topo">🏔️ ภูมิประเทศ</button>
+    </div>
+  </div>
+</div>
+
+<div id="kml-modal">
+  <div id="kml-modal-content">
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;">
+      <b>รายงานข้อมูล Polygon</b>
+      <button id="btn-close-kml-modal" style="width:auto;padding:4px 10px;background:#7f1d1d;">✖ ปิด</button>
+    </div>
+    <div id="kml-modal-body"></div>
+    <div class="row" style="margin-top:10px;">
+      <button id="btn-download-kml-report" style="background:#065f46;">📥 ดาวน์โหลดรายงาน (.txt)</button>
+    </div>
+  </div>
+</div>
+
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<script src="https://unpkg.com/leaflet-draw@1.0.4/dist/leaflet.draw.js"></script>
+<script src="https://unpkg.com/@turf/turf@6/turf.min.js"></script>
+<script src="https://unpkg.com/html2canvas@1.4.1/dist/html2canvas.min.js"></script>
+<script src="https://unpkg.com/jspdf@2.5.1/dist/jspdf.umd.min.js"></script>
+
+<script>
+(function() {
+  'use strict';
+
+  /* ============================================================
+   * UTILITY FUNCTIONS
+   * ============================================================ */
+  function metersPerPixel(lat, zoom) {
+    return 156543.03392 * Math.cos(lat * Math.PI / 180) / Math.pow(2, zoom);
+  }
+  function formatLength(m) { return m >= 1000 ? (m / 1000).toFixed(2) + ' กม.' : m.toFixed(1) + ' ม.'; }
+  function formatArea(sqm) { return sqm >= 1600 ? (sqm / 1600).toFixed(2) + ' ไร่ (' + sqm.toFixed(0) + ' ตร.ม.)' : sqm.toFixed(1) + ' ตร.ม.'; }
+  function shiftLatLngs(latlngs, dLat, dLng) {
+    if (Array.isArray(latlngs[0])) return latlngs.map(function(arr) { return shiftLatLngs(arr, dLat, dLng); });
+    return latlngs.map(function(ll) { return L.latLng(ll.lat + dLat, ll.lng + dLng); });
+  }
+  function isHexColor(str) { return typeof str === 'string' && /^#([0-9A-Fa-f]{3}){1,2}$/.test(str); }
+  function escapeHtml(str) { return String(str).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;'); }
+  function shadeColor(hex, percent) {
+    if (!isHexColor(hex)) hex = '#4caf50';
+    hex = hex.replace('#', '');
+    if (hex.length === 3) hex = hex.split('').map(function(c) { return c + c; }).join('');
+    var num = parseInt(hex, 16);
+    var r = (num >> 16), g = (num >> 8 & 0x00FF), b = (num & 0x0000FF);
+    if (percent >= 0) {
+      r = Math.min(255, Math.round(r + (255 - r) * percent));
+      g = Math.min(255, Math.round(g + (255 - g) * percent));
+      b = Math.min(255, Math.round(b + (255 - b) * percent));
+    } else {
+      var p = 1 + percent;
+      r = Math.max(0, Math.round(r * p)); g = Math.max(0, Math.round(g * p)); b = Math.max(0, Math.round(b * p));
+    }
+    return '#' + ((1 << 24) + (r << 16) + (g << 8) + b).toString(16).slice(1);
+  }
+  function formatThousands(num, decimals) {
+    return num.toLocaleString('en-US', { minimumFractionDigits: decimals, maximumFractionDigits: decimals });
+  }
+  function safeDownload(blob, filename) {
+    var url = URL.createObjectURL(blob);
+    var a = document.createElement('a');
+    a.href = url; a.download = filename;
+    document.body.appendChild(a); a.click(); document.body.removeChild(a);
+    setTimeout(function() { URL.revokeObjectURL(url); }, 1000);
+  }
+  function showToast(message, type) {
+    type = type || 'info';
+    var container = document.getElementById('toast-container');
+    var toast = document.createElement('div');
+    toast.className = 'toast ' + type;
+    toast.textContent = message;
+    container.appendChild(toast);
+    requestAnimationFrame(function() { toast.classList.add('show'); });
+    setTimeout(function() {
+      toast.classList.remove('show');
+      setTimeout(function() { toast.remove(); }, 300);
+    }, 3000);
+  }
+
+  /* ============================================================
+   * UTM WGS84 CONVERSION
+   * ============================================================ */
+  function latLonToUTM(lat, lon, zone) {
+    var a = 6378137.0, eccSquared = 0.00669438, k0 = 0.9996;
+    var latRad = lat * Math.PI / 180, lonRad = lon * Math.PI / 180;
+    var lonOrigin = (zone * 6 - 183), lonOriginRad = lonOrigin * Math.PI / 180;
+    var eccPrimeSquared = eccSquared / (1 - eccSquared);
+    var N = a / Math.sqrt(1 - eccSquared * Math.sin(latRad) * Math.sin(latRad));
+    var T = Math.tan(latRad) * Math.tan(latRad);
+    var C = eccPrimeSquared * Math.cos(latRad) * Math.cos(latRad);
+    var A = Math.cos(latRad) * (lonRad - lonOriginRad);
+    var M = a * ((1 - eccSquared / 4 - 3 * eccSquared * eccSquared / 64 - 5 * Math.pow(eccSquared, 3) / 256) * latRad
+      - (3 * eccSquared / 8 + 3 * eccSquared * eccSquared / 32 + 45 * Math.pow(eccSquared, 3) / 1024) * Math.sin(2 * latRad)
+      + (15 * eccSquared * eccSquared / 256 + 45 * Math.pow(eccSquared, 3) / 1024) * Math.sin(4 * latRad)
+      - (35 * Math.pow(eccSquared, 3) / 3072) * Math.sin(6 * latRad));
+    var easting = k0 * N * (A + (1 - T + C) * Math.pow(A, 3) / 6 + (5 - 18 * T + T * T + 72 * C - 58 * eccPrimeSquared) * Math.pow(A, 5) / 120) + 500000.0;
+    var northing = k0 * (M + N * Math.tan(latRad) * (A * A / 2 + (5 - T + 9 * C + 4 * C * C) * Math.pow(A, 4) / 24 + (61 - 58 * T + T * T + 600 * C - 330 * eccPrimeSquared) * Math.pow(A, 6) / 720));
+    if (lat < 0) northing += 10000000.0;
+    return { easting: easting, northing: northing };
+  }
+
+  /* ============================================================
+   * COLOR PRESETS
+   * ============================================================ */
+  var PLANT_PRESETS = [
+    { n: 'เขียวสด', c: '#66bb6a' }, { n: 'เขียวเข้ม', c: '#1b5e20' }, { n: 'เขียวมะกอก', c: '#7cb342' },
+    { n: 'เขียวอมเหลือง', c: '#c0ca33' }, { n: 'เขียวสน', c: '#2e7d32' }, { n: 'เขียวพุ่ม', c: '#4caf50' }, { n: 'เขียวมิ้นท์', c: '#26a69a' }
+  ];
+  var MATERIAL_PRESETS = [
+    { n: 'น้ำตาลดิน', c: '#795548' }, { n: 'น้ำตาลไม้', c: '#8d6e63' }, { n: 'เทาลาน', c: '#9e9e9e' },
+    { n: 'ฟ้าน้ำ', c: '#29b6f6' }, { n: 'แดงอิฐ', c: '#bf360c' }, { n: 'ครีมทราย', c: '#d7ccc8' }, { n: 'ดำเส้น', c: '#000000' }
+  ];
+  function buildPresetRow(containerId, inputId) {
+    var container = document.getElementById(containerId);
+    container.innerHTML = '';
+    PLANT_PRESETS.concat(MATERIAL_PRESETS).forEach(function(p) {
+      var b = document.createElement('button');
+      b.type = 'button'; b.className = 'preset-btn'; b.title = p.n; b.style.background = p.c;
+      if (p.c === '#000000') b.style.border = '1px solid #666';
+      b.addEventListener('click', function(e) {
+        e.preventDefault();
+        var inp = document.getElementById(inputId);
+        inp.value = p.c;
+        inp.dispatchEvent(new Event('input'));
+        inp.dispatchEvent(new Event('change'));
+      });
+      container.appendChild(b);
+    });
+  }
+
+  /* ============================================================
+   * FIXED BLOB SHAPES
+   * ============================================================ */
+  var TREE_OUTER = "88,50 82,66 74,81 58,86 42,87 28,78 15,67 13,50 16,34 28,22 41,12 58,14 74,20 82,34";
+  var TREE_HIGHLIGHT = "49,36 43,46 33,46 27,36 33,27 44,27";
+  var SHRUB_OUTER = "83,50 77,66 67,79 50,82 34,79 23,66 16,50 22,34 34,21 50,19 67,21 78,34";
+  var SHRUB_HIGHLIGHT = "47,38 43,46 34,46 29,38 34,30 43,30";
+  var ICON_DEFAULT_FILL = { tree: '#3f8f5c', shrubMid: '#4f9a63', largeShrub: '#2e7d32', palm: '#123018' };
+
+  function inlineSvgDefs(fill) {
+    return '<defs>' +
+      '<radialGradient id="tsg_' + fill.replace('#','') + '" cx="50%" cy="50%" r="50%">' +
+        '<stop offset="0%" stop-color="#000" stop-opacity="0.60"/>' +
+        '<stop offset="55%" stop-color="#000" stop-opacity="0.42"/>' +
+        '<stop offset="100%" stop-color="#000" stop-opacity="0"/>' +
+      '</radialGradient>' +
+      '<pattern id="hg_' + fill.replace('#','') + '" width="6" height="6" patternTransform="rotate(45)" patternUnits="userSpaceOnUse">' +
+        '<line x1="0" y1="0" x2="0" y2="6" stroke="#0f3319" stroke-width="1.5" opacity="0.55"/>' +
+      '</pattern>' +
+      '<pattern id="hgc_' + fill.replace('#','') + '" width="5" height="5" patternTransform="rotate(-20)" patternUnits="userSpaceOnUse">' +
+        '<line x1="0" y1="0" x2="0" y2="5" stroke="#1b4d2e" stroke-width="1.1" opacity="0.5"/>' +
+      '</pattern>' +
+    '</defs>';
+  }
+  function shadowRef(fill) { return 'url(#tsg_' + fill.replace('#','') + ')'; }
+  function hatchRef(fill) { return 'url(#hg_' + fill.replace('#','') + ')'; }
+  function hatchCrossRef(fill) { return 'url(#hgc_' + fill.replace('#','') + ')'; }
+
+  /* ============================================================
+   * EDITABLE GEO-ANCHORED IMAGE
+   * ============================================================ */
+  L.EditableGeoImage = L.Layer.extend({
+    initialize: function(url, latlng, wM, hM, rot, opacity) {
+      this._url = url; this._latlng = L.latLng(latlng);
+      this._widthMeters = wM; this._heightMeters = hM;
+      this._rotation = rot || 0; this._opacity = (opacity != null) ? opacity : 0.85;
+      this._locked = false;
+      this._useFrontPane = true;
+    },
+    onAdd: function(map) {
+      this._map = map;
+      this._img = L.DomUtil.create('img', 'geo-editable-image');
+      this._img.src = this._url; this._img.crossOrigin = 'anonymous';
+      this._img.style.position = 'absolute'; this._img.style.opacity = this._opacity;
+      this._img.style.left = '0px'; this._img.style.top = '0px';
+      this._img.style.cursor = this._locked ? 'not-allowed' : 'move';
+      this._appendToPane();
+      map.on('moveend zoomend', this._reposition, this);
+      this._reposition(); this._bindEvents();
+    },
+    onRemove: function(map) {
+      if (this._img && this._img.parentNode) this._img.parentNode.removeChild(this._img);
+      map.off('moveend zoomend', this._reposition, this);
+    },
+    setOpacity: function(op) { this._opacity = op; if (this._img) this._img.style.opacity = op; },
+    setLocked: function(locked) {
+      this._locked = locked;
+      if (this._img) this._img.style.cursor = locked ? 'not-allowed' : 'move';
+    },
+    getLocked: function() { return this._locked; },
+    setZOrder: function(front) {
+      this._useFrontPane = front;
+      if (this._map && this._img) {
+        this._appendToPane();
+        this._reposition();
+      }
+    },
+    _appendToPane: function() {
+      if (this._img.parentNode) this._img.parentNode.removeChild(this._img);
+      if (this._useFrontPane) {
+        this._map.getPane('geoImagePane').appendChild(this._img);
+      } else {
+        this._map.getPanes().overlayPane.appendChild(this._img);
+      }
+    },
+    _reposition: function() {
+      var map = this._map;
+      var c = map.latLngToLayerPoint(this._latlng);
+      var mpp = metersPerPixel(this._latlng.lat, map.getZoom());
+      var pw = this._widthMeters / mpp, ph = this._heightMeters / mpp;
+      this._img.style.width = pw + 'px'; this._img.style.height = ph + 'px';
+      this._img.style.transform = 'translate3d(' + (c.x - pw / 2) + 'px, ' + (c.y - ph / 2) + 'px, 0) rotate(' + this._rotation + 'deg)';
+      this._lastPixelWidth = pw; this._lastPixelHeight = ph;
+    },
+    _bindEvents: function() {
+      var self = this;
+      this._img.addEventListener('mousedown', function(e) {
+        if (self._locked) return;
+        if (e.button !== 0) return;
+        e.preventDefault(); e.stopPropagation();
+        var map = self._map; map.dragging.disable();
+        var shiftMode = e.shiftKey;
+        var startClientX = e.clientX, startClientY = e.clientY;
+        var startLatLng = self._latlng;
+        var startW = self._widthMeters, startH = self._heightMeters;
+        var startPxW = self._lastPixelWidth || 100;
+        function onMove(ev) {
+          var dx = ev.clientX - startClientX, dy = ev.clientY - startClientY;
+          if (shiftMode) {
+            var scale = Math.max(0.05, (startPxW + dx) / startPxW);
+            self._widthMeters = startW * scale; self._heightMeters = startH * scale;
+            self._reposition();
+          } else {
+            var startPoint = map.latLngToContainerPoint(startLatLng);
+            var newPoint = L.point(startPoint.x + dx, startPoint.y + dy);
+            self._latlng = map.containerPointToLatLng(newPoint);
+            self._reposition();
+          }
+        }
+        function onUp() {
+          document.removeEventListener('mousemove', onMove);
+          document.removeEventListener('mouseup', onUp);
+          map.dragging.enable();
+        }
+        document.addEventListener('mousemove', onMove);
+        document.addEventListener('mouseup', onUp);
+      });
+    }
+  });
+
+  /* ============================================================
+   * SCALED TREE/PALM/SHRUB ICON
+   * ============================================================ */
+  L.ScaledIcon = L.Layer.extend({
+    initialize: function(latlng, type, diameterMeters, opts) {
+      this._latlng = L.latLng(latlng); this._type = type; this._diameter = diameterMeters;
+      this._rot = (opts && opts.rot != null) ? opts.rot : 0;
+      this._fillColor = (opts && opts.fillColor) || ICON_DEFAULT_FILL[type] || '#3f8f5c';
+    },
+    onAdd: function(map) {
+      this._map = map;
+      this._el = L.DomUtil.create('div', 'scaled-tree-icon');
+      this._el.style.cursor = 'pointer';
+      this._el.innerHTML = this._buildInnerHTML();
+      map.getPane('markerPane').appendChild(this._el);
+      map.on('moveend zoomend', this._reposition, this);
+      this._reposition(); this._bindEvents();
+    },
+    onRemove: function(map) { L.DomUtil.remove(this._el); map.off('moveend zoomend', this._reposition, this); },
+    getLatLng: function() { return this._latlng; },
+    setLatLng: function(latlng) { this._latlng = L.latLng(latlng); this._reposition(); return this; },
+    setFillColor: function(color) { this._fillColor = color; if (this._el) this._el.innerHTML = this._buildInnerHTML(); },
+    _buildInnerHTML: function() {
+      var fill = this._fillColor;
+      var defs = inlineSvgDefs(fill);
+      var sRef = shadowRef(fill);
+      var hRef = hatchRef(fill);
+      var hcRef = hatchCrossRef(fill);
+      if (this._type === 'palm') {
+        var trunk = shadeColor(fill, -0.3);
+        var circleStroke = shadeColor(fill, 0.15);
+        return '<svg viewBox="0 0 100 100">' + defs +
+          '<ellipse cx="70" cy="70" rx="38" ry="36" fill="' + sRef + '"/>' +
+          '<circle cx="50" cy="50" r="44" fill="none" stroke="' + circleStroke + '" stroke-width="1.8" stroke-dasharray="3,4" opacity="0.6"/>' +
+          '<g stroke="' + fill + '" stroke-width="3.8" stroke-linecap="round">' +
+          '<line x1="50" y1="50" x2="50" y2="7"/><line x1="50" y1="50" x2="81" y2="17"/>' +
+          '<line x1="50" y1="50" x2="93" y2="50"/><line x1="50" y1="50" x2="81" y2="83"/>' +
+          '<line x1="50" y1="50" x2="50" y2="93"/><line x1="50" y1="50" x2="19" y2="83"/>' +
+          '<line x1="50" y1="50" x2="7" y2="50"/><line x1="50" y1="50" x2="19" y2="17"/>' +
+          '</g><circle cx="50" cy="50" r="7.5" fill="' + trunk + '"/></svg>';
+      }
+      if (this._type === 'shrubMid') {
+        var strokeDarkS = shadeColor(fill, -0.55), highlightS = shadeColor(fill, 0.55);
+        return '<svg viewBox="0 0 100 100">' + defs +
+          '<ellipse cx="67" cy="67" rx="33" ry="31" fill="' + sRef + '"/>' +
+          '<polygon points="' + SHRUB_OUTER + '" fill="' + fill + '" stroke="' + strokeDarkS + '" stroke-width="2.8"/>' +
+          '<polygon points="' + SHRUB_OUTER + '" fill="' + hcRef + '"/>' +
+          '<polygon points="' + SHRUB_HIGHLIGHT + '" fill="' + highlightS + '" opacity="0.7"/></svg>';
+      }
+      if (this._type === 'largeShrub') {
+        var strokeDarkL = shadeColor(fill, -0.55), highlightL = shadeColor(fill, 0.55);
+        return '<svg viewBox="0 0 100 100">' + defs +
+          '<ellipse cx="72" cy="72" rx="40" ry="38" fill="' + sRef + '"/>' +
+          '<polygon points="' + TREE_OUTER + '" fill="' + fill + '" stroke="' + strokeDarkL + '" stroke-width="3.4"/>' +
+          '<polygon points="' + TREE_OUTER + '" fill="' + hRef + '"/>' +
+          '<polygon points="' + TREE_HIGHLIGHT + '" fill="' + highlightL + '" opacity="0.8"/>' +
+          '<circle cx="50" cy="50" r="6.5" fill="' + strokeDarkL + '"/></svg>';
+      }
+      var strokeDark = shadeColor(fill, -0.55), highlight = shadeColor(fill, 0.55);
+      return '<svg viewBox="0 0 100 100">' + defs +
+        '<ellipse cx="72" cy="72" rx="40" ry="38" fill="' + sRef + '"/>' +
+        '<polygon points="' + TREE_OUTER + '" fill="' + fill + '" stroke="' + strokeDark + '" stroke-width="3.4"/>' +
+        '<polygon points="' + TREE_OUTER + '" fill="' + hRef + '"/>' +
+        '<polygon points="' + TREE_HIGHLIGHT + '" fill="' + highlight + '" opacity="0.8"/>' +
+        '<circle cx="50" cy="50" r="6.5" fill="' + strokeDark + '"/></svg>';
+    },
+    _reposition: function() {
+      var map = this._map;
+      var c = map.latLngToLayerPoint(this._latlng);
+      var mpp = metersPerPixel(this._latlng.lat, map.getZoom());
+      var px = Math.max(6, this._diameter / mpp);
+      this._el.style.width = px + 'px'; this._el.style.height = px + 'px';
+      this._el.style.left = (c.x - px / 2) + 'px'; this._el.style.top = (c.y - px / 2) + 'px';
+      this._el.style.transformOrigin = 'center center';
+      this._el.style.transform = 'rotate(' + (this._rot || 0) + 'deg)';
+    },
+    _bindEvents: function() {
+      var self = this;
+      this._el.addEventListener('click', function(e) {
+        if (currentTool && ['eraser', 'move', 'color'].indexOf(currentTool.kind) !== -1) {
+          e.stopPropagation();
+          if (currentTool.kind === 'eraser') { drawnItems.removeLayer(self); updateBOQ(); pushHistory(); }
+          else if (currentTool.kind === 'move') { selectLayerForMove(self); }
+          else if (currentTool.kind === 'color') { selectLayerForColor(self); }
+        }
+      });
+      this._el.addEventListener('mousedown', function(e) {
+        if (e.button !== 0) return;
+        var allowed = !currentTool || currentTool.kind === 'move';
+        if (!allowed) return;
+        e.stopPropagation(); e.preventDefault();
+        map.dragging.disable();
+        function onMove(ev) { self.setLatLng(map.mouseEventToLatLng(ev)); }
+        function onUp() {
+          document.removeEventListener('mousemove', onMove);
+          document.removeEventListener('mouseup', onUp);
+          map.dragging.enable(); pushHistory();
+        }
+        document.addEventListener('mousemove', onMove);
+        document.addEventListener('mouseup', onUp);
+      });
+    },
+    toGeoJSON: function() {
+      return {
+        type: 'Feature',
+        properties: { type: this._type, diameter: this._diameter, rot: this._rot, fillColor: this._fillColor },
+        geometry: { type: 'Point', coordinates: [this._latlng.lng, this._latlng.lat] }
+      };
+    }
+  });
+
+  /* ============================================================
+   * GROUP MOVE HANDLERS
+   * ============================================================ */
+  function attachGroupMoveHandlers(group) {
+    group.eachLayer(function(sub) {
+      sub.on('mousedown', function(e) {
+        if (e.originalEvent && e.originalEvent.button !== 0) return;
+        if (!(currentTool && currentTool.kind === 'move')) return;
+        L.DomEvent.stop(e);
+        selectLayerForMove(group); map.dragging.disable();
+        var startLatLng = e.latlng;
+        var subsOriginal = [];
+        group.eachLayer(function(s2) { subsOriginal.push({ s2: s2, orig: JSON.parse(JSON.stringify(s2.getLatLngs())) }); });
+        var lastD = { lat: 0, lng: 0 };
+        function onMove(ev) {
+          var cur = map.mouseEventToLatLng(ev);
+          lastD = { lat: cur.lat - startLatLng.lat, lng: cur.lng - startLatLng.lng };
+          subsOriginal.forEach(function(o) { o.s2.setLatLngs(shiftLatLngs(o.orig, lastD.lat, lastD.lng)); });
+        }
+        function onUp() {
+          document.removeEventListener('mousemove', onMove);
+          document.removeEventListener('mouseup', onUp);
+          map.dragging.enable();
+          var geom = group.feature.geometry;
+          if (geom.type === 'LineString') geom.coordinates = geom.coordinates.map(function(c) { return [c[0] + lastD.lng, c[1] + lastD.lat]; });
+          else if (geom.type === 'Polygon') geom.coordinates = geom.coordinates.map(function(ring) { return ring.map(function(c) { return [c[0] + lastD.lng, c[1] + lastD.lat]; }); });
+          updateBOQ(); pushHistory();
+        }
+        document.addEventListener('mousemove', onMove);
+        document.addEventListener('mouseup', onUp);
+      });
+    });
+  }
+
+  /* ============================================================
+   * FENCE
+   * ============================================================ */
+  function buildFenceTicks(latlngs, spacing, tickLen) {
+    var coords = latlngs.map(function(ll) { return [ll.lng, ll.lat]; });
+    if (coords.length < 2) return [];
+    var line = turf.lineString(coords);
+    var totalLen = turf.length(line, { units: 'meters' });
+    if (totalLen < 0.05) return [];
+    var ticks = [];
+    for (var d = 0; d <= totalLen + 0.0001; d += spacing) {
+      var dd = Math.min(d, totalLen);
+      var pt = turf.along(line, dd, { units: 'meters' });
+      var d1 = Math.max(dd - 0.05, 0), d2 = Math.min(dd + 0.05, totalLen);
+      var p1 = turf.along(line, d1, { units: 'meters' });
+      var p2 = turf.along(line, d2, { units: 'meters' });
+      var bearing = turf.bearing(p1, p2);
+      var left = turf.destination(pt, tickLen / 2, bearing + 90, { units: 'meters' });
+      var right = turf.destination(pt, tickLen / 2, bearing - 90, { units: 'meters' });
+      ticks.push([[left.geometry.coordinates[1], left.geometry.coordinates[0]], [right.geometry.coordinates[1], right.geometry.coordinates[0]]]);
+    }
+    return ticks;
+  }
+  function createFenceLayer(latlngs, spacingM, coordsOverride, colorOverride) {
+    spacingM = Math.max(0.3, spacingM || fenceSpacingM);
+    var color = colorOverride || '#4a3728';
+    var group = L.layerGroup();
+    /* [FIX] bubblingMouseEvents: false ป้องกัน event bubble ไปรบกวน Draw handler ขณะกำลังวาด */
+    var baseline = L.polyline(latlngs, { color: color, weight: 2, bubblingMouseEvents: false });
+    group.addLayer(baseline);
+    var ticks = buildFenceTicks(latlngs, spacingM, 0.6);
+    ticks.forEach(function(t) { group.addLayer(L.polyline(t, { color: color, weight: 2, interactive: false })); });
+    var coords = coordsOverride || latlngs.map(function(ll) { return [ll.lng, ll.lat]; });
+    group.feature = { type: 'Feature', properties: { type: 'fence', customStroke: color }, geometry: { type: 'LineString', coordinates: coords } };
+    group._isFenceGroup = true; group._postCount = ticks.length;
+    baseline.on('click', function() {
+      if (currentTool && currentTool.kind === 'eraser') { drawnItems.removeLayer(group); updateBOQ(); pushHistory(); return; }
+      if (currentTool && currentTool.kind === 'color') { selectLayerForColor(group); return; }
+      if (currentTool && currentTool.kind === 'shapeEdit') { showToast('รั้วยังไม่รองรับการแก้ไขจุดรูปทรงโดยตรง', 'info'); return; }
+      if (currentTool && currentTool.kind === 'lineStyle') { selectLineStyleLayer(group); return; }
+    });
+    attachGroupMoveHandlers(group);
+    return group;
+  }
+  function updateFenceColor(group, color) {
+    group.eachLayer(function(sub) { sub.setStyle({ color: color }); });
+    if (group.feature) group.feature.properties.customStroke = color;
+  }
+  function applyGroupLineStyle(group) {
+    var p = group.feature.properties;
+    if (p.customWeight != null || p.customOpacityLine != null) {
+      group.eachLayer(function(l) {
+        var style = {};
+        if (p.customWeight != null) style.weight = p.customWeight;
+        if (p.customOpacityLine != null) style.opacity = p.customOpacityLine;
+        l.setStyle(style);
+      });
+    }
+  }
+
+  /* ============================================================
+   * SHRUB GROUP
+   * ============================================================ */
+  function generateHatchLines(latlngs, spacingMeters) {
+    var coords = latlngs.map(function(ll) { return [ll.lng, ll.lat]; });
+    if (coords.length < 3) return [];
+    if (coords[0][0] !== coords[coords.length - 1][0] || coords[0][1] !== coords[coords.length - 1][1]) coords.push(coords[0].slice());
+    var poly; try { poly = turf.polygon([coords]); } catch (e) { return []; }
+    var bbox = turf.bbox(poly);
+    var mPerDegLat = 111320;
+    var spacingDegLat = spacingMeters / mPerDegLat;
+    var minC = bbox[1] - bbox[2], maxC = bbox[3] - bbox[0];
+    var estCount = (maxC - minC) / spacingDegLat;
+    var MAX_LINES = 160;
+    if (estCount > MAX_LINES) spacingDegLat = (maxC - minC) / MAX_LINES;
+    var padX = (bbox[2] - bbox[0]) * 0.2 + 0.0006;
+    var result = [];
+    for (var c = minC; c <= maxC; c += spacingDegLat) {
+      var x1 = bbox[0] - padX, y1 = x1 + c;
+      var x2 = bbox[2] + padX, y2 = x2 + c;
+      var pts;
+      try { pts = turf.lineIntersect(turf.lineString([[x1, y1], [x2, y2]]), poly); } catch (e) { continue; }
+      if (!pts || !pts.features || pts.features.length < 2) continue;
+      var along = pts.features.map(function(f) { return { x: f.geometry.coordinates[0], y: f.geometry.coordinates[1] }; });
+      along.sort(function(a, b) { return a.x - b.x; });
+      for (var i = 0; i < along.length - 1; i++) {
+        var mx = (along[i].x + along[i + 1].x) / 2, my = (along[i].y + along[i + 1].y) / 2;
+        var inside = false;
+        try { inside = turf.booleanPointInPolygon(turf.point([mx, my]), poly); } catch (e) { }
+        if (inside) result.push([L.latLng(along[i].y, along[i].x), L.latLng(along[i + 1].y, along[i + 1].x)]);
+      }
+    }
+    return result;
+  }
+  function createShrubGroupLayer(latlngs, opts) {
+    opts = opts || {};
+    var fillColor = opts.fillColor || '#5fae72', strokeColor = opts.strokeColor || '#153d24';
+    var group = L.layerGroup();
+    /* [FIX] bubblingMouseEvents: false */
+    var poly = L.polygon(latlngs, { color: strokeColor, weight: 3, fillColor: fillColor, fillOpacity: 0.38, bubblingMouseEvents: false });
+    group.addLayer(poly);
+    var hatchLines = generateHatchLines(latlngs, 1.4);
+    hatchLines.forEach(function(seg) { group.addLayer(L.polyline(seg, { color: strokeColor, weight: 1.4, opacity: 0.6, interactive: false })); });
+    var ring = latlngs.map(function(ll) { return [ll.lng, ll.lat]; }); ring.push(ring[0].slice());
+    group.feature = { type: 'Feature', properties: { type: 'shrubGroup', customFill: fillColor, customStroke: strokeColor }, geometry: { type: 'Polygon', coordinates: [ring] } };
+    group._isShrubGroup = true; group._mainPolygon = poly;
+    poly.on('click', function() {
+      if (currentTool && currentTool.kind === 'eraser') { drawnItems.removeLayer(group); updateBOQ(); pushHistory(); return; }
+      if (currentTool && currentTool.kind === 'color') { selectLayerForColor(group); return; }
+      if (currentTool && currentTool.kind === 'shapeEdit') { showToast('กลุ่มไม้พุ่มยังไม่รองรับการแก้ไขจุดรูปทรงโดยตรง', 'info'); return; }
+      if (currentTool && currentTool.kind === 'lineStyle') { selectLineStyleLayer(group); return; }
+    });
+    attachGroupMoveHandlers(group);
+    return group;
+  }
+
+  /* ============================================================
+   * ARROW
+   * ============================================================ */
+  function createArrowLayer(p1, p2, colorOverride) {
+    var color = colorOverride || '#e11d48';
+    var group = L.layerGroup();
+    /* [FIX] bubblingMouseEvents: false */
+    var line = L.polyline([p1, p2], { color: color, weight: 3, bubblingMouseEvents: false });
+    group.addLayer(line);
+    var bearing = turf.bearing(turf.point([p1.lng, p1.lat]), turf.point([p2.lng, p2.lat]));
+    var headMarker = L.marker(p2, {
+      icon: L.divIcon({
+        html: '<div style="width:0;height:0;border-left:7px solid transparent;border-right:7px solid transparent;border-bottom:18px solid ' + color + ';transform:rotate(' + bearing + 'deg);transform-origin:50% 100%;"></div>',
+        className: '', iconSize: [14, 18], iconAnchor: [7, 18]
+      }), interactive: false
+    });
+    group.addLayer(headMarker);
+    group.feature = { type: 'Feature', properties: { type: 'arrow', customStroke: color }, geometry: { type: 'LineString', coordinates: [[p1.lng, p1.lat], [p2.lng, p2.lat]] } };
+    group._isArrowGroup = true; group._line = line; group._headMarker = headMarker;
+    line.on('click', function() {
+      if (currentTool && currentTool.kind === 'eraser') { drawnItems.removeLayer(group); updateBOQ(); pushHistory(); return; }
+      if (currentTool && currentTool.kind === 'color') { selectLayerForColor(group); return; }
+      if (currentTool && currentTool.kind === 'shapeEdit') { showToast('ลูกศรยังไม่รองรับการแก้ไขจุดรูปทรงโดยตรง', 'info'); return; }
+      if (currentTool && currentTool.kind === 'lineStyle') { showToast('ลูกศรยังไม่รองรับการปรับขนาด/ความโปร่งใสของเส้น', 'info'); return; }
+    });
+    attachArrowMoveHandlers(group);
+    return group;
+  }
+  function attachArrowMoveHandlers(group) {
+    group._line.on('mousedown', function(e) {
+      if (e.originalEvent && e.originalEvent.button !== 0) return;
+      if (!(currentTool && currentTool.kind === 'move')) return;
+      L.DomEvent.stop(e);
+      selectLayerForMove(group); map.dragging.disable();
+      var startLatLng = e.latlng;
+      var origLineLatLngs = group._line.getLatLngs().map(function(ll) { return L.latLng(ll.lat, ll.lng); });
+      var origHeadLatLng = group._headMarker.getLatLng();
+      var lastD = { lat: 0, lng: 0 };
+      function onMove(ev) {
+        var cur = map.mouseEventToLatLng(ev);
+        lastD = { lat: cur.lat - startLatLng.lat, lng: cur.lng - startLatLng.lng };
+        group._line.setLatLngs(origLineLatLngs.map(function(ll) { return L.latLng(ll.lat + lastD.lat, ll.lng + lastD.lng); }));
+        group._headMarker.setLatLng(L.latLng(origHeadLatLng.lat + lastD.lat, origHeadLatLng.lng + lastD.lng));
+      }
+      function onUp() {
+        document.removeEventListener('mousemove', onMove);
+        document.removeEventListener('mouseup', onUp);
+        map.dragging.enable();
+        var geom = group.feature.geometry;
+        geom.coordinates = geom.coordinates.map(function(c) { return [c[0] + lastD.lng, c[1] + lastD.lat]; });
+        updateBOQ(); pushHistory();
+      }
+      document.addEventListener('mousemove', onMove);
+      document.addEventListener('mouseup', onUp);
+    });
+  }
+  function updateArrowColor(group, color) {
+    group._line.setStyle({ color: color });
+    var el = group._headMarker.getElement();
+    if (el) { var tri = el.querySelector('div'); if (tri) tri.style.borderBottomColor = color; }
+    group.feature.properties.customStroke = color;
+  }
+
+  /* ============================================================
+   * STATE VARIABLES
+   * ============================================================ */
+  var DEFAULT_LAT = 18.8609, DEFAULT_LNG = 98.7229;
+  /* [FIX] maxZoom: 23 ตามที่ผู้ใช้ขอ */
+  var map = L.map('map', { zoomControl: false, renderer: L.canvas({ padding: 0.5 }), maxZoom: 23 }).setView([DEFAULT_LAT, DEFAULT_LNG], 17);
+
+  map.createPane('geoImagePane');
+  map.getPane('geoImagePane').style.zIndex = 620;
+  map.getPane('geoImagePane').style.pointerEvents = 'auto';
+
+  /* [FIX] maxZoom: 23 สำหรับ basemap ทั้งหมด, คง maxNativeZoom สำหรับดิจิตอลซูม */
+  var basemapSatellite = L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}', { attribution: 'Tiles &copy; Esri', maxZoom: 23, maxNativeZoom: 21, crossOrigin: true });
+  var basemapTopo = L.tileLayer('https://{s}.tile.opentopomap.org/{z}/{x}/{y}.png', { attribution: 'Map data: &copy; OpenStreetMap contributors, SRTM | Map style: &copy; OpenTopoMap (CC-BY-SA)', maxZoom: 23, maxNativeZoom: 17, crossOrigin: true });
+
+  basemapSatellite.addTo(map);
+  L.control.zoom({ position: 'bottomright' }).addTo(map);
+  L.control.scale({ metric: true, imperial: false, position: 'bottomleft' }).addTo(map);
+  var drawnItems = new L.FeatureGroup().addTo(map);
+  var typeVisibility = {};
+  var roadWidthM = 4, pathWidthM = 2, treeDiaM = 8, palmDiaM = 4.5, shrubDiaM = 4.5, largeShrubDiaM = 6, fenceSpacingM = 2;
+
+  var typeLabels = {
+    tree: 'ต้นไม้ใหญ่', palm: 'ปาล์ม', shrubMid: 'ไม้พุ่มกลาง', largeShrub: 'ไม้พุ่มใหญ่', poi: 'จุดสนใจ', text: 'ข้อความ',
+    path: 'ทางเดิน', road: 'ถนน', sketch: 'สเก็ตช์อิสระ', fence: 'แนวรั้ว', boundary: 'ขอบเขตพื้นที่ออกแบบ',
+    shrubGroup: 'กลุ่มไม้พุ่ม', planting: 'แปลงปลูก', lawn: 'สนามหญ้า', gravel: 'ลานกรวดหิน', water: 'น้ำ', hardscape: 'ลานพื้นแข็ง', deck: 'เดคไม้', building: 'อาคาร',
+    freePolygon: 'โพลีกอนอิสระ', measureLine: 'เส้นวัดระยะ', measureArea: 'พื้นที่วัด',
+    kmlPoint: 'จุดนำเข้าจาก KML', kmlLine: 'เส้นนำเข้าจาก KML', kmlPolygon: 'พื้นที่นำเข้าจาก KML',
+    arrow: 'ลูกศรชี้ทิศทาง', freeLine: 'เส้นโพลีไลน์'
+  };
+
+  var ANNOTATION_TYPES = ['text', 'arrow', 'sketch'];
+
+  /* [FIX-สำคัญ] เปลี่ยน bubblingMouseEvents จาก true เป็น false ทั้งหมด
+   * สาเหตุ: เมื่อ bubblingMouseEvents: true, mouse events จาก layer ที่มีอยู่แล้ว
+   * จะ bubble ขึ้นไปยัง map ซึ่ง Leaflet Draw handler จะได้รับ event นั้น
+   * ทำให้ Draw handler คิดว่า user คลิกจุดใหม่ ส่งผลให้เส้น/โพลีกอนปิดตัวเองก่อนกำหนด
+   *
+   * การแก้: ตั้ง bubblingMouseEvents: false เพื่อให้ layer รับ events ได้ตามปกติ
+   * แต่ไม่ bubble ไปรบกวน Draw handler ที่กำลังทำงานอยู่
+   */
+  var lineStyles = {
+    path: { color: '#c9a876', weight: 4, dashArray: '2,6', bubblingMouseEvents: false },
+    road: { color: '#555', weight: 8, bubblingMouseEvents: false },
+    sketch: { color: '#e91e63', weight: 3, bubblingMouseEvents: false },
+    fence: { color: '#4a3728', weight: 2, dashArray: '1,4', bubblingMouseEvents: false },
+    boundary: { color: '#d32f2f', weight: 3, dashArray: '14,6,2,6', bubblingMouseEvents: false },
+    measureLine: { color: '#d32f2f', weight: 2.5, dashArray: '6,4', bubblingMouseEvents: false },
+    kmlLine: { color: '#f59e0b', weight: 3, dashArray: '2,4', bubblingMouseEvents: false },
+    freeLine: { color: '#111827', weight: 3, opacity: 1, bubblingMouseEvents: false }
+  };
+  var areaStyles = {
+    shrubGroup: { color: '#153d24', weight: 3, fillColor: '#5fae72', fillOpacity: .38, bubblingMouseEvents: false },
+    planting: { color: '#6d4c31', fillColor: '#a1887f', fillOpacity: .5, bubblingMouseEvents: false },
+    lawn: { color: '#2e7d32', weight: 2, fillColor: '#8bc34a', fillOpacity: .55, bubblingMouseEvents: false },
+    gravel: { color: '#78716c', weight: 2, fillColor: '#d6d3d1', fillOpacity: .65, bubblingMouseEvents: false },
+    water: { color: '#0277bd', fillColor: '#4fc3f7', fillOpacity: .6, bubblingMouseEvents: false },
+    hardscape: { color: '#757575', fillColor: '#e0e0e0', fillOpacity: .6, bubblingMouseEvents: false },
+    deck: { color: '#8d6e63', fillColor: '#d7ccc8', fillOpacity: .7, bubblingMouseEvents: false },
+    building: { color: '#212121', fillColor: '#9e9e9e', fillOpacity: .8, bubblingMouseEvents: false },
+    freePolygon: { color: '#111827', weight: 2, fillColor: '#9ca3af', fillOpacity: .25, dashArray: '4,4', bubblingMouseEvents: false },
+    measureArea: { color: '#d32f2f', weight: 2.5, fillColor: '#ef5350', fillOpacity: .2, dashArray: '6,4', bubblingMouseEvents: false },
+    kmlPolygon: { color: '#f59e0b', weight: 2.5, fillColor: '#fde68a', fillOpacity: .35, dashArray: '2,4', bubblingMouseEvents: false }
+  };
+
+  var currentTool = null, activeHandler = null;
+  var selectedLayer = null, selectedBaseGeoJSON = null;
+  var selectedColorLayer = null;
+  var selectedLineStyleLayer = null, selectedLineStyleMode = null;
+  var selectedTextSizeLayer = null;
+  var currentlyEditingLayer = null;
+  var historyStack = [], historyIndex = -1, suspendHistory = false;
+  var arrowFirstPoint = null;
+  var DRAWING_KINDS = ['line', 'polygon', 'rectangle', 'freePolygon', 'measureLine', 'measureArea', 'pen'];
+
+  function iconFor(type) {
+    var m = { poi: ['📍', 26], kmlPoint: ['📍', 24] };
+    var t = m[type] || ['⬤', 18];
+    return L.divIcon({ html: '<div style="font-size:' + t[1] + 'px;line-height:1">' + t[0] + '</div>', className: '', iconSize: [t[1], t[1]], iconAnchor: [t[1] / 2, t[1] / 2] });
+  }
+
+  /* ============================================================
+   * BASEMAP SWITCHING
+   * ============================================================ */
+  function switchBasemap(kind) {
+    document.querySelectorAll('#basemap-switcher button').forEach(function(b) { b.classList.remove('active'); });
+    [basemapSatellite, basemapTopo].forEach(function(l) { if (map.hasLayer(l)) map.removeLayer(l); });
+    if (kind === 'sat') { basemapSatellite.addTo(map); document.getElementById('btn-basemap-sat').classList.add('active'); }
+    else if (kind === 'topo') { basemapTopo.addTo(map); document.getElementById('btn-basemap-topo').classList.add('active'); }
+    drawnItems.eachLayer(function(l) { if (l.bringToFront) l.bringToFront(); });
+  }
+
+  /* ============================================================
+   * TOOL ACTIVATION
+   * ============================================================ */
+  function activatePan() {
+    stopTool(); currentTool = null;
+    document.querySelectorAll('#sidebar button').forEach(function(b) { b.classList.remove('active'); });
+    document.getElementById('btn-pan').classList.add('active'); map.dragging.enable();
+  }
+  function activateMove() {
+    stopTool(); currentTool = { kind: 'move' };
+    document.querySelectorAll('#sidebar button').forEach(function(b) { b.classList.remove('active'); });
+    document.getElementById('btn-move').classList.add('active'); map.dragging.enable();
+  }
+  function activateColor() {
+    stopTool(); currentTool = { kind: 'color' };
+    document.querySelectorAll('#sidebar button').forEach(function(b) { b.classList.remove('active'); });
+    document.getElementById('btn-color').classList.add('active'); map.dragging.enable();
+  }
+  function activateShapeEdit() {
+    stopTool(); currentTool = { kind: 'shapeEdit' };
+    document.querySelectorAll('#sidebar button').forEach(function(b) { b.classList.remove('active'); });
+    document.getElementById('btn-shape-edit').classList.add('active');
+    document.getElementById('shape-edit-hint').style.display = 'block'; map.dragging.enable();
+  }
+  function activateTextEdit() {
+    stopTool(); currentTool = { kind: 'textEdit' };
+    document.querySelectorAll('#sidebar button').forEach(function(b) { b.classList.remove('active'); });
+    document.getElementById('btn-text-edit').classList.add('active');
+    document.getElementById('text-edit-hint').style.display = 'block'; map.dragging.enable();
+  }
+  function activateLineStyleTool() {
+    stopTool(); currentTool = { kind: 'lineStyle' };
+    document.querySelectorAll('#sidebar button').forEach(function(b) { b.classList.remove('active'); });
+    document.getElementById('btn-line-style').classList.add('active'); map.dragging.enable();
+  }
+  function activateTextSizeTool() {
+    stopTool(); currentTool = { kind: 'textSize' };
+    document.querySelectorAll('#sidebar button').forEach(function(b) { b.classList.remove('active'); });
+    document.getElementById('btn-text-size').classList.add('active'); map.dragging.enable();
+  }
+  function activateCoordCheck() {
+    if (currentTool && currentTool.kind === 'coordCheck') {
+      stopTool(); currentTool = null;
+      document.querySelectorAll('#sidebar button').forEach(function(b) { b.classList.remove('active'); });
+      return;
+    }
+    stopTool(); currentTool = { kind: 'coordCheck' };
+    document.querySelectorAll('#sidebar button').forEach(function(b) { b.classList.remove('active'); });
+    document.getElementById('btn-coord-check').classList.add('active');
+    map.dragging.enable(); map.getContainer().style.cursor = 'crosshair';
+    map.on('click', onCoordCheckClick);
+  }
+  function activateTraverseMode() {
+    if (currentTool && currentTool.kind === 'traverse') {
+      stopTool(); currentTool = null;
+      document.querySelectorAll('#sidebar button').forEach(function(b) { b.classList.remove('active'); });
+      return;
+    }
+    stopTool(); currentTool = { kind: 'traverse' };
+    document.querySelectorAll('#sidebar button').forEach(function(b) { b.classList.remove('active'); });
+    document.getElementById('btn-traverse-mode').classList.add('active');
+    document.getElementById('traverse-controls').style.display = 'block';
+    map.dragging.enable(); map.getContainer().style.cursor = 'crosshair';
+    map.on('click', onTraverseClick);
+  }
+  function startArrowTool() {
+    stopTool(); currentTool = { kind: 'arrow' };
+    document.querySelectorAll('#sidebar button').forEach(function(b) { b.classList.remove('active'); });
+    document.getElementById('btn-arrow').classList.add('active');
+    arrowFirstPoint = null; map.getContainer().style.cursor = 'crosshair';
+    map.on('click', onArrowClick);
+  }
+  function onArrowClick(e) {
+    if (!arrowFirstPoint) { arrowFirstPoint = e.latlng; }
+    else {
+      var group = createArrowLayer(arrowFirstPoint, e.latlng);
+      drawnItems.addLayer(group);
+      arrowFirstPoint = null;
+      map.off('click', onArrowClick);
+      map.getContainer().style.cursor = '';
+      currentTool = null;
+      document.querySelectorAll('#sidebar button').forEach(function(b) { b.classList.remove('active'); });
+      updateBOQ(); pushHistory();
+    }
+  }
+
+  /* ============================================================
+   * MOVE / COLOR / LINE STYLE / TEXT SIZE SELECTION
+   * ============================================================ */
+  function selectLayerForMove(layer) {
+    selectedLayer = layer;
+    document.getElementById('move-controls').style.display = 'block';
+    document.getElementById('inp-object-rotate').value = (layer instanceof L.ScaledIcon) ? (layer._rot || 0) : 0;
+    var t = (layer._isFenceGroup || layer._isShrubGroup || layer._isArrowGroup) ? (layer.feature.properties.type) : (layer.feature && layer.feature.properties && layer.feature.properties.type) || (layer._type) || 'วัตถุ';
+    document.getElementById('move-target-label').textContent = 'กำลังแก้ไข: ' + (typeLabels[t] || t);
+    if (layer._isFenceGroup) selectedBaseGeoJSON = turf.lineString(layer.feature.geometry.coordinates);
+    else if (layer._isShrubGroup) selectedBaseGeoJSON = turf.polygon(layer.feature.geometry.coordinates);
+    else if (layer._isArrowGroup) selectedBaseGeoJSON = turf.lineString(layer.feature.geometry.coordinates);
+    else if (layer instanceof L.ScaledIcon || layer instanceof L.Marker) selectedBaseGeoJSON = null;
+    else if (layer.toGeoJSON) selectedBaseGeoJSON = layer.toGeoJSON();
+    else selectedBaseGeoJSON = null;
+  }
+  function deselectMoveTarget() {
+    selectedLayer = null; selectedBaseGeoJSON = null;
+    document.getElementById('move-controls').style.display = 'none';
+    document.getElementById('inp-object-rotate').value = 0;
+    document.getElementById('move-target-label').textContent = 'ยังไม่ได้เลือกวัตถุ';
+  }
+  function colorModeFor(layer) {
+    if (layer instanceof L.ScaledIcon) return 'icon';
+    if (layer instanceof L.Marker) {
+      if (layer.feature && layer.feature.properties && layer.feature.properties.type === 'text') return 'text';
+      return 'none';
+    }
+    if (layer._isArrowGroup) return 'arrow';
+    if (layer._isShrubGroup) return 'shrubgroupfill';
+    if (layer._isFenceGroup) return 'fence';
+    if (layer instanceof L.Polygon) return 'fillstroke';
+    if (layer instanceof L.Polyline) return 'stroke';
+    return 'none';
+  }
+  function selectLayerForColor(layer) {
+    var mode = colorModeFor(layer);
+    if (mode === 'none') return;
+    selectedColorLayer = layer;
+    document.getElementById('color-controls').style.display = 'block';
+    var t = (layer._isFenceGroup || layer._isShrubGroup || layer._isArrowGroup) ? layer.feature.properties.type : (layer.feature && layer.feature.properties && layer.feature.properties.type) || (layer._type) || 'วัตถุ';
+    document.getElementById('color-target-label').textContent = 'กำลังแก้ไข: ' + (typeLabels[t] || t);
+    var fillRow = document.getElementById('color-fill-row'), strokeRow = document.getElementById('color-stroke-row');
+    var fillInput = document.getElementById('inp-color-fill'), strokeInput = document.getElementById('inp-color-stroke');
+    var fillLabel = document.getElementById('color-fill-label'), strokeLabel = document.getElementById('color-stroke-label');
+    if (mode === 'icon') {
+      fillRow.style.display = 'block'; strokeRow.style.display = 'none';
+      fillLabel.textContent = 'สีทรงใบไม้/ก้านใบ';
+      fillInput.value = isHexColor(layer._fillColor) ? layer._fillColor : '#4caf50';
+    } else if (mode === 'text') {
+      fillRow.style.display = 'block'; strokeRow.style.display = 'none';
+      fillLabel.textContent = 'สีตัวอักษร';
+      var curTxt = (layer.feature && layer.feature.properties && layer.feature.properties.color) || '#111111';
+      fillInput.value = isHexColor(curTxt) ? curTxt : '#111111';
+    } else if (mode === 'fillstroke') {
+      fillRow.style.display = 'block'; strokeRow.style.display = 'block';
+      fillLabel.textContent = 'สีพื้น (เติม)'; strokeLabel.textContent = 'สีเส้นขอบ';
+      fillInput.value = isHexColor(layer.options.fillColor) ? layer.options.fillColor : '#66bb6a';
+      strokeInput.value = isHexColor(layer.options.color) ? layer.options.color : '#000000';
+    } else if (mode === 'stroke') {
+      fillRow.style.display = 'none'; strokeRow.style.display = 'block';
+      strokeLabel.textContent = 'สีเส้น';
+      strokeInput.value = isHexColor(layer.options.color) ? layer.options.color : '#000000';
+    } else if (mode === 'fence') {
+      fillRow.style.display = 'none'; strokeRow.style.display = 'block';
+      strokeLabel.textContent = 'สีรั้ว';
+      var curFence = (layer.feature && layer.feature.properties && layer.feature.properties.customStroke) || '#4a3728';
+      strokeInput.value = isHexColor(curFence) ? curFence : '#4a3728';
+    } else if (mode === 'shrubgroupfill') {
+      fillRow.style.display = 'block'; strokeRow.style.display = 'block';
+      fillLabel.textContent = 'สีพื้น (เติม)'; strokeLabel.textContent = 'สีเส้น/ลายเส้น';
+      fillInput.value = isHexColor(layer.feature.properties.customFill) ? layer.feature.properties.customFill : '#5fae72';
+      strokeInput.value = isHexColor(layer.feature.properties.customStroke) ? layer.feature.properties.customStroke : '#153d24';
+    } else if (mode === 'arrow') {
+      fillRow.style.display = 'none'; strokeRow.style.display = 'block';
+      strokeLabel.textContent = 'สีลูกศร';
+      var curArrow = (layer.feature && layer.feature.properties && layer.feature.properties.customStroke) || '#e11d48';
+      strokeInput.value = isHexColor(curArrow) ? curArrow : '#e11d48';
+    }
+  }
+  function deselectColorTarget() { selectedColorLayer = null; document.getElementById('color-controls').style.display = 'none'; }
+  function applyTextColor(layer, color) {
+    var el = layer.getElement && layer.getElement();
+    if (el) { var lbl = el.querySelector('.map-text-label'); if (lbl) lbl.style.color = color; }
+    if (layer.feature) layer.feature.properties.color = color;
+  }
+  function selectLineStyleLayer(layer) {
+    var mode = null;
+    if (layer._isFenceGroup) mode = 'fenceGroup';
+    else if (layer._isShrubGroup) mode = 'shrubGroup';
+    else if ((layer instanceof L.Polyline) && !(layer instanceof L.Polygon) && !layer._isArrowGroup) mode = 'line';
+    if (!mode) return;
+    selectedLineStyleLayer = layer; selectedLineStyleMode = mode;
+    document.getElementById('lineStyle-controls').style.display = 'block';
+    var t = layer.feature.properties.type;
+    document.getElementById('lineStyle-target-label').textContent = 'กำลังแก้ไข: ' + (typeLabels[t] || t);
+    var curWeight, curOpacity;
+    if (mode === 'line') {
+      curWeight = layer.options.weight || 3;
+      curOpacity = (layer.options.opacity != null) ? layer.options.opacity : 1;
+    } else {
+      var firstSub = layer.getLayers()[0];
+      curWeight = (firstSub && firstSub.options.weight) || 3;
+      curOpacity = (firstSub && firstSub.options.opacity != null) ? firstSub.options.opacity : 1;
+    }
+    document.getElementById('inp-line-weight').value = curWeight;
+    document.getElementById('inp-line-opacity').value = Math.round(curOpacity * 100);
+  }
+  function deselectLineStyleTarget() {
+    selectedLineStyleLayer = null; selectedLineStyleMode = null;
+    document.getElementById('lineStyle-controls').style.display = 'none';
+  }
+  function selectTextSizeLayer(layer) {
+    if (!layer.feature || layer.feature.properties.type !== 'text') return;
+    selectedTextSizeLayer = layer;
+    document.getElementById('textSize-controls').style.display = 'block';
+    document.getElementById('textSize-target-label').textContent = 'กำลังแก้ไขขนาดข้อความ';
+    var el = layer.getElement();
+    var lbl = el && el.querySelector('.map-text-label');
+    var curSize = lbl ? parseInt(window.getComputedStyle(lbl).fontSize) || 18 : 18;
+    document.getElementById('inp-text-size').value = curSize;
+  }
+  function deselectTextSizeTarget() {
+    selectedTextSizeLayer = null;
+    document.getElementById('textSize-controls').style.display = 'none';
+  }
+
+  /* ============================================================
+   * ROTATION & SHAPE EDITING
+   * ============================================================ */
+  function applyGeoJSONToLayer(layer, geojson) {
+    var geom = geojson.geometry;
+    if (geom.type === 'Polygon') layer.setLatLngs(geom.coordinates[0].map(function(c) { return L.latLng(c[1], c[0]); }));
+    else if (geom.type === 'LineString') layer.setLatLngs(geom.coordinates.map(function(c) { return L.latLng(c[1], c[0]); }));
+    updateBOQ();
+  }
+  function toggleShapeEditing(layer) {
+    if (!layer.editing) { showToast('วัตถุนี้ไม่รองรับการแก้ไขจุดรูปทรงโดยตรง', 'info'); return; }
+    if (currentlyEditingLayer && currentlyEditingLayer !== layer) {
+      currentlyEditingLayer.editing.disable(); currentlyEditingLayer.off('edit');
+    }
+    if (currentlyEditingLayer === layer) {
+      layer.editing.disable(); layer.off('edit'); currentlyEditingLayer = null;
+    } else {
+      layer.editing.enable(); currentlyEditingLayer = layer;
+      layer.on('edit', function() {
+        var p = layer.feature && layer.feature.properties;
+        if (p && p.type === 'measureLine') {
+          var len = turf.length(layer.toGeoJSON(), { units: 'meters' });
+          p.lengthMeters = len; layer.setTooltipContent(formatLength(len));
+        } else if (p && p.type === 'measureArea') {
+          var area = turf.area(layer.toGeoJSON());
+          p.areaSqm = area; layer.setTooltipContent(formatArea(area));
+        }
+        updateBOQ(); pushHistory();
+      });
+    }
+  }
+  function editTextLayer(layer) {
+    var cur = (layer.feature && layer.feature.properties && layer.feature.properties.label) || '';
+    var newTxt = prompt('แก้ไขข้อความ:', cur);
+    if (newTxt === null || newTxt === '') return;
+    layer.feature.properties.label = newTxt;
+    var el = layer.getElement();
+    var lbl = el && el.querySelector('.map-text-label');
+    if (lbl) lbl.textContent = newTxt;
+    pushHistory();
+  }
+  function makeMarkerMovable(layer) {
+    layer.on('mousedown', function(e) {
+      if (e.originalEvent && e.originalEvent.button !== 0) return;
+      var allowed = !currentTool || currentTool.kind === 'move';
+      if (!allowed) return;
+      L.DomEvent.stop(e);
+      if (currentTool && currentTool.kind === 'move') selectLayerForMove(layer);
+      map.dragging.disable();
+      function onMove(ev) { layer.setLatLng(map.mouseEventToLatLng(ev)); }
+      function onUp() {
+        document.removeEventListener('mousemove', onMove);
+        document.removeEventListener('mouseup', onUp);
+        map.dragging.enable(); pushHistory();
+      }
+      document.addEventListener('mousemove', onMove);
+      document.addEventListener('mouseup', onUp);
+    });
+  }
+  function makeShapeMovable(layer) {
+    layer.on('mousedown', function(e) {
+      if (e.originalEvent && e.originalEvent.button !== 0) return;
+      if (!(currentTool && currentTool.kind === 'move')) return;
+      L.DomEvent.stop(e);
+      selectLayerForMove(layer); map.dragging.disable();
+      var startLatLng = e.latlng;
+      var originalLatLngs = JSON.parse(JSON.stringify(layer.getLatLngs()));
+      function onMove(ev) {
+        var cur = map.mouseEventToLatLng(ev);
+        var dLat = cur.lat - startLatLng.lat, dLng = cur.lng - startLatLng.lng;
+        layer.setLatLngs(shiftLatLngs(originalLatLngs, dLat, dLng));
+      }
+      function onUp() {
+        document.removeEventListener('mousemove', onMove);
+        document.removeEventListener('mouseup', onUp);
+        map.dragging.enable(); updateBOQ(); pushHistory();
+      }
+      document.addEventListener('mousemove', onMove);
+      document.addEventListener('mouseup', onUp);
+    });
+  }
+
+  /* ============================================================
+   * TOOL START / STOP
+   * ============================================================ */
+  function startTool(kind, type) {
+    stopTool(); currentTool = { kind: kind, type: type };
+    document.querySelectorAll('#sidebar button').forEach(function(b) { b.classList.remove('active'); });
+    if (DRAWING_KINDS.indexOf(kind) !== -1) document.body.classList.add('drawing-mode');
+    if (kind === 'marker') { activeHandler = new L.Draw.Marker(map, { icon: iconFor(type) }); activeHandler.enable(); map.dragging.enable(); }
+    else if (kind === 'line') { activeHandler = new L.Draw.Polyline(map, { shapeOptions: lineStyles[type] }); activeHandler.enable(); map.dragging.enable(); }
+    else if (kind === 'polygon') { activeHandler = new L.Draw.Polygon(map, { shapeOptions: areaStyles[type] }); activeHandler.enable(); map.dragging.enable(); }
+    else if (kind === 'rectangle') { activeHandler = new L.Draw.Rectangle(map, { shapeOptions: areaStyles[type] }); activeHandler.enable(); map.dragging.enable(); }
+    else if (kind === 'text') { map.once('click', onAddText); }
+    else if (kind === 'pen') { enableFreehand(); }
+    else if (kind === 'freePolygon') { activeHandler = new L.Draw.Polygon(map, { shapeOptions: areaStyles.freePolygon }); activeHandler.enable(); map.dragging.enable(); }
+    else if (kind === 'measureLine') { activeHandler = new L.Draw.Polyline(map, { shapeOptions: lineStyles.measureLine }); activeHandler.enable(); map.dragging.enable(); }
+    else if (kind === 'measureArea') { activeHandler = new L.Draw.Polygon(map, { shapeOptions: areaStyles.measureArea }); activeHandler.enable(); map.dragging.enable(); }
+  }
+  function stopTool() {
+    if (activeHandler) { activeHandler.disable(); activeHandler = null; }
+    map.off('click', onAddText);
+    map.off('click', onCoordCheckClick);
+    map.off('click', onTraverseClick);
+    map.off('click', onArrowClick);
+    map.off('click', onCalibMapClick);
+    arrowFirstPoint = null;
+    map.getContainer().style.cursor = '';
+    disableFreehand(); map.dragging.enable();
+    deselectMoveTarget(); deselectColorTarget(); deselectLineStyleTarget(); deselectTextSizeTarget();
+    if (currentlyEditingLayer) { currentlyEditingLayer.editing.disable(); currentlyEditingLayer.off('edit'); currentlyEditingLayer = null; }
+    document.getElementById('shape-edit-hint').style.display = 'none';
+    document.getElementById('text-edit-hint').style.display = 'none';
+    document.body.classList.remove('drawing-mode');
+  }
+
+  /* ============================================================
+   * DRAW EVENT HANDLER
+   * ============================================================ */
+  map.on(L.Draw.Event.CREATED, function(e) {
+    var layer = e.layer, type = currentTool.type, kind = currentTool.kind;
+    if (kind === 'marker' && ['tree', 'palm', 'shrubMid', 'largeShrub'].indexOf(type) !== -1) {
+      var dia = type === 'tree' ? treeDiaM : type === 'palm' ? palmDiaM : type === 'largeShrub' ? largeShrubDiaM : shrubDiaM;
+      var icon = new L.ScaledIcon(layer.getLatLng(), type, dia);
+      drawnItems.addLayer(icon); updateBOQ(); pushHistory();
+      activeHandler = new L.Draw.Marker(map, { icon: iconFor(type) });
+      activeHandler.enable(); map.dragging.enable();
+      return;
+    }
+    if (type === 'fence') {
+      var fenceGroup = createFenceLayer(layer.getLatLngs());
+      drawnItems.addLayer(fenceGroup); updateBOQ(); pushHistory();
+      currentTool = null; document.body.classList.remove('drawing-mode');
+      return;
+    }
+    if (type === 'shrubGroup') {
+      var raw = layer.getLatLngs();
+      var ring = Array.isArray(raw[0]) ? raw[0] : raw;
+      var shrubGroup = createShrubGroupLayer(ring);
+      drawnItems.addLayer(shrubGroup); updateBOQ(); pushHistory();
+      currentTool = null; document.body.classList.remove('drawing-mode');
+      return;
+    }
+    if (kind === 'measureLine') {
+      var len = turf.length(layer.toGeoJSON(), { units: 'meters' });
+      layer.feature = { type: 'Feature', properties: { type: 'measureLine', lengthMeters: len } };
+      layer.bindTooltip(formatLength(len), { permanent: true, direction: 'center', className: 'measure-label' });
+      attachLayerEvents(layer); drawnItems.addLayer(layer); updateBOQ(); pushHistory();
+      currentTool = null; document.body.classList.remove('drawing-mode');
+      return;
+    }
+    if (kind === 'measureArea') {
+      var area = turf.area(layer.toGeoJSON());
+      layer.feature = { type: 'Feature', properties: { type: 'measureArea', areaSqm: area } };
+      layer.bindTooltip(formatArea(area), { permanent: true, direction: 'center', className: 'measure-label' });
+      attachLayerEvents(layer); drawnItems.addLayer(layer); updateBOQ(); pushHistory();
+      currentTool = null; document.body.classList.remove('drawing-mode');
+      return;
+    }
+    layer.feature = { type: 'Feature', properties: { type: type } };
+    if (typeLabels[type]) layer.bindTooltip(typeLabels[type], { direction: 'top' });
+    if (type === 'road' || type === 'path') {
+      var widthM = type === 'road' ? roadWidthM : pathWidthM;
+      var mpp = metersPerPixel(map.getCenter().lat, map.getZoom());
+      layer.setStyle({ weight: Math.max(1, widthM / mpp) });
+      layer.feature.properties.widthMeters = widthM;
+    }
+    attachLayerEvents(layer); drawnItems.addLayer(layer); updateBOQ(); pushHistory();
+    if (kind === 'marker') { activeHandler = new L.Draw.Marker(map, { icon: iconFor(type) }); activeHandler.enable(); map.dragging.enable(); }
+    else { currentTool = null; document.body.classList.remove('drawing-mode'); }
+  });
+
+  map.on('zoomend', function() {
+    drawnItems.eachLayer(function(layer) {
+      var p = layer.feature && layer.feature.properties;
+      if (p && p.widthMeters && layer instanceof L.Polyline) {
+        var lls = layer.getLatLngs();
+        var lat = (lls[0] && lls[0].lat != null) ? lls[0].lat : map.getCenter().lat;
+        var mpp = metersPerPixel(lat, map.getZoom());
+        layer.setStyle({ weight: Math.max(1, p.widthMeters / mpp) });
+      }
+    });
+  });
+
+  function attachLayerEvents(layer) {
+    layer.on('click', function() {
+      if (currentTool && currentTool.kind === 'eraser') { drawnItems.removeLayer(layer); updateBOQ(); pushHistory(); return; }
+      if (currentTool && currentTool.kind === 'move') { selectLayerForMove(layer); return; }
+      if (currentTool && currentTool.kind === 'color') { selectLayerForColor(layer); return; }
+      if (currentTool && currentTool.kind === 'shapeEdit') { toggleShapeEditing(layer); return; }
+      if (currentTool && currentTool.kind === 'lineStyle') { selectLineStyleLayer(layer); return; }
+      if (currentTool && currentTool.kind === 'textSize') { selectTextSizeLayer(layer); return; }
+      if (currentTool && currentTool.kind === 'textEdit') {
+        if (layer.feature && layer.feature.properties && layer.feature.properties.type === 'text') editTextLayer(layer);
+        return;
+      }
+    });
+    if (layer instanceof L.Marker) makeMarkerMovable(layer);
+    else if (layer.setLatLngs) makeShapeMovable(layer);
+  }
+
+  function onAddText(e) {
+    var txt = prompt('พิมพ์ข้อความ:');
+    if (txt) {
+      var font = document.getElementById('inp-font-select').value;
+      var color = '#111111';
+      var marker = L.marker(e.latlng, {
+        icon: L.divIcon({
+          html: '<div class="rotator-inner" style="transform:rotate(0deg)"><div class="map-text-label" style="font-family:' + font + '; color:' + color + '; font-size:18px;">' + escapeHtml(txt) + '</div></div>',
+          className: 'clean-text-icon', iconSize: [1, 1], iconAnchor: [0, 10]
+        })
+      });
+      marker.feature = { type: 'Feature', properties: { type: 'text', label: txt, font: font, rot: 0, color: color, fontSize: 18 } };
+      attachLayerEvents(marker); drawnItems.addLayer(marker); updateBOQ(); pushHistory();
+    }
+    currentTool = null;
+  }
+
+  /* ============================================================
+   * FREEHAND
+   * ============================================================ */
+  var fhLL = [], fhLine = null;
+  function enableFreehand() { map.dragging.disable(); map.on('mousedown', fhStart); }
+  function disableFreehand() { map.dragging.enable(); map.off('mousedown', fhStart); }
+  function fhStart(e) {
+    if (e.originalEvent && e.originalEvent.button !== 0) return;
+    fhLL = [e.latlng];
+    fhLine = L.polyline(fhLL, { color: '#e91e63', weight: 3, bubblingMouseEvents: false }).addTo(map);
+    map.on('mousemove', fhMove); map.on('mouseup', fhEnd);
+  }
+  function fhMove(e) { fhLL.push(e.latlng); fhLine.setLatLngs(fhLL); }
+  function fhEnd() {
+    map.off('mousemove', fhMove); map.off('mouseup', fhEnd);
+    fhLine.feature = { type: 'Feature', properties: { type: 'sketch' } };
+    attachLayerEvents(fhLine); drawnItems.addLayer(fhLine); updateBOQ(); pushHistory();
+  }
+
+  function clearAll() {
+    if (confirm('ล้างงานวาดทั้งหมด?')) {
+      drawnItems.clearLayers(); typeVisibility = {}; kmlLayers = []; renderKmlLayersList(); updateBOQ();
+      deselectMoveTarget(); deselectColorTarget(); deselectLineStyleTarget(); deselectTextSizeTarget();
+      pushHistory();
+    }
+  }
+
+  /* ============================================================
+   * BOQ
+   * ============================================================ */
+  function getLayerType(layer) {
+    if (layer._isFenceGroup) return 'fence';
+    if (layer._isShrubGroup) return 'shrubGroup';
+    if (layer._isArrowGroup) return 'arrow';
+    if (layer instanceof L.ScaledIcon) return layer._type;
+    return layer.feature && layer.feature.properties && layer.feature.properties.type;
+  }
+  function toggleTypeVisibility(type, visible) {
+    typeVisibility[type] = visible;
+    drawnItems.eachLayer(function(layer) {
+      if (getLayerType(layer) === type) {
+        if (visible) { if (!map.hasLayer(layer)) layer.addTo(map); }
+        else { if (map.hasLayer(layer)) map.removeLayer(layer); }
+      }
+    });
+  }
+  function getBOQData(includeAnnotations) {
+    var counts = {}, lengths = {}, areas = {};
+    var annoCounts = {};
+    var fencePosts = 0;
+    var KML_TYPES = ['kmlPoint', 'kmlLine', 'kmlPolygon'];
+    drawnItems.eachLayer(function(layer) {
+      if (layer._isFenceGroup) {
+        lengths['fence'] = (lengths['fence'] || 0) + turf.length(layer.feature, { units: 'kilometers' }) * 1000;
+        fencePosts += (layer._postCount || 0); return;
+      }
+      if (layer._isShrubGroup) {
+        areas['shrubGroup'] = (areas['shrubGroup'] || 0) + turf.area(layer.feature); return;
+      }
+      if (layer._isArrowGroup) {
+        if (includeAnnotations) annoCounts['arrow'] = (annoCounts['arrow'] || 0) + 1;
+        return;
+      }
+      if (layer instanceof L.ScaledIcon) { counts[layer._type] = (counts[layer._type] || 0) + 1; return; }
+      var type = layer.feature && layer.feature.properties && layer.feature.properties.type;
+      if (!type) return;
+      if (type === 'measureLine' || type === 'measureArea') return;
+      if (KML_TYPES.indexOf(type) !== -1) return;
+      if (ANNOTATION_TYPES.indexOf(type) !== -1) {
+        if (includeAnnotations) annoCounts[type] = (annoCounts[type] || 0) + 1;
+        return;
+      }
+      if (layer instanceof L.Marker) counts[type] = (counts[type] || 0) + 1;
+      else if (layer instanceof L.Polygon) areas[type] = (areas[type] || 0) + turf.area(layer.toGeoJSON());
+      else if (layer instanceof L.Polyline) lengths[type] = (lengths[type] || 0) + turf.length(layer.toGeoJSON(), { units: 'kilometers' }) * 1000;
+    });
+    var rows = [], no = 1;
+    Object.keys(counts).forEach(function(t) { rows.push({ no: no++, type: t, label: typeLabels[t] || t, qty: counts[t], unit: 'ต้น/จุด', isAnno: false }); });
+    Object.keys(lengths).forEach(function(t) { rows.push({ no: no++, type: t, label: typeLabels[t] || t, qty: lengths[t].toFixed(1), unit: 'ม.', isAnno: false }); });
+    if (fencePosts > 0) rows.push({ no: no++, type: null, label: 'จำนวนเสารั้ว (ประมาณ)', qty: fencePosts, unit: 'ต้น/เสา', isAnno: false });
+    Object.keys(areas).forEach(function(t) { rows.push({ no: no++, type: t, label: typeLabels[t] || t, qty: areas[t].toFixed(1), unit: 'ตร.ม.', isAnno: false }); });
+    if (includeAnnotations && Object.keys(annoCounts).length > 0) {
+      rows.push({ no: null, type: '__section__', label: '📝 หมายเหตุประกอบ (ไม่รวมในรายงาน)', qty: '', unit: '', isAnno: false, isSection: true });
+      Object.keys(annoCounts).forEach(function(t) {
+        rows.push({ no: no++, type: t, label: typeLabels[t] || t, qty: annoCounts[t], unit: 'รายการ', isAnno: true });
+      });
+    }
+    return rows;
+  }
+  function updateBOQ() {
+    var rows = getBOQData(true);
+    var boqBody = document.getElementById('boq-body');
+    if (rows.length === 0) {
+      boqBody.innerHTML = '<tr><td colspan="5" style="text-align:center;color:#888">ยังไม่มีข้อมูล</td></tr>'; return;
+    }
+    boqBody.innerHTML = rows.map(function(r) {
+      if (r.isSection) {
+        return '<tr class="boq-section-row"><td colspan="5">' + escapeHtml(r.label) + '</td></tr>';
+      }
+      if (!r.type) return '<tr><td class="chk-cell">—</td><td>' + r.no + '</td><td' + (r.isAnno ? ' style="color:#fbbf24"' : '') + '>' + escapeHtml(r.label) + '</td><td style="text-align:right">' + r.qty + '</td><td>' + r.unit + '</td></tr>';
+      var checked = typeVisibility[r.type] !== false ? 'checked' : '';
+      var labelStyle = r.isAnno ? ' style="color:#fbbf24"' : '';
+      return '<tr><td class="chk-cell"><input type="checkbox" ' + checked + ' data-type="' + escapeHtml(r.type) + '"></td><td>' + r.no + '</td><td' + labelStyle + '>' + escapeHtml(r.label) + '</td><td style="text-align:right">' + r.qty + '</td><td>' + r.unit + '</td></tr>';
+    }).join('');
+    boqBody.querySelectorAll('input[type="checkbox"][data-type]').forEach(function(cb) {
+      cb.addEventListener('change', function() { toggleTypeVisibility(this.getAttribute('data-type'), this.checked); });
+    });
+  }
+  function downloadBOQText() {
+    var rows = getBOQData(false);
+    if (!rows.length) { showToast('ยังไม่มีข้อมูล BOQ', 'error'); return; }
+    var txt = 'ตาราง Bill of Quantities (BOQ) — ' + document.getElementById('inp-title').value + '\r\n';
+    txt += '--------------------------------------------------\r\nลำดับ\tรายการ\tปริมาณ\tหน่วย\r\n--------------------------------------------------\r\n';
+    rows.forEach(function(r) {
+      if (!r.isSection) txt += r.no + '\t' + r.label + '\t' + r.qty + '\t' + r.unit + '\r\n';
+    });
+    txt += '--------------------------------------------------\r\n';
+    safeDownload(new Blob([txt], { type: 'text/plain;charset=utf-8' }), 'BOQ-summary.txt');
+  }
+
+  /* ============================================================
+   * PLACE SEARCH
+   * ============================================================ */
+  function searchPlace() {
+    var q = document.getElementById('inp-search-place').value.trim();
+    var resultsBox = document.getElementById('search-results');
+    if (!q) { resultsBox.style.display = 'none'; resultsBox.innerHTML = ''; return; }
+    resultsBox.style.display = 'block';
+    resultsBox.innerHTML = '<div style="padding:8px;color:#9ca3af;font-size:11px;">กำลังค้นหา...</div>';
+    fetch('https://nominatim.openstreetmap.org/search?format=json&addressdetails=0&limit=6&accept-language=th&q=' + encodeURIComponent(q), {
+      headers: { 'Accept': 'application/json' }
+    }).then(function(resp) { return resp.json(); })
+    .then(function(data) {
+      if (!data.length) {
+        resultsBox.innerHTML = '<div style="padding:8px;color:#9ca3af;font-size:11px;">ไม่พบสถานที่ ลองคำค้นหาอื่น</div>';
+        return;
+      }
+      resultsBox.innerHTML = data.map(function(d, i) {
+        return '<div class="search-result-item" data-idx="' + i + '">' + escapeHtml(d.display_name) + '</div>';
+      }).join('');
+      resultsBox.querySelectorAll('.search-result-item').forEach(function(el) {
+        el.addEventListener('click', function() {
+          var idx = parseInt(this.getAttribute('data-idx'));
+          var item = data[idx];
+          map.setView([parseFloat(item.lat), parseFloat(item.lon)], 18);
+          document.getElementById('inp-search-place').value = item.display_name;
+          resultsBox.style.display = 'none'; resultsBox.innerHTML = '';
+        });
+      });
+    }).catch(function() {
+      resultsBox.innerHTML = '<div style="padding:8px;color:#f87171;font-size:11px;">ค้นหาไม่สำเร็จ กรุณาลองใหม่</div>';
+    });
+  }
+
+  /* ============================================================
+   * COORDINATE CHECK
+   * ============================================================ */
+  var coordPoints = [];
+  var coordMarkersLayer = L.layerGroup().addTo(map);
+  function makeCoordCheckIcon(no) {
+    return L.divIcon({
+      html: '<div style="position:relative;width:0;height:0;">' +
+        '<div style="position:absolute;left:0;top:0;transform:translate(-50%,-50%);font-size:20px;color:#ff1744;line-height:1;text-shadow:0 0 3px #fff, 0 0 3px #fff;">✛</div>' +
+        '<div style="position:absolute;left:9px;top:-16px;background:#111827;color:#fff;font-size:10.5px;font-weight:700;padding:1px 5px;border-radius:3px;white-space:nowrap;box-shadow:0 1px 3px rgba(0,0,0,.6);">' + no + '</div>' +
+        '</div>', className: '', iconSize: [1, 1]
+    });
+  }
+  function onCoordCheckClick(e) {
+    var lat = e.latlng.lat, lng = e.latlng.lng;
+    var utm = latLonToUTM(lat, lng, 47);
+    var noteVal = document.getElementById('inp-coord-note').value.trim();
+    var no = coordPoints.length + 1;
+    var marker = L.marker(e.latlng, { icon: makeCoordCheckIcon(no) });
+    marker.addTo(coordMarkersLayer);
+    coordPoints.push({ no: no, lat: lat, lng: lng, e: utm.easting, n: utm.northing, note: noteVal, marker: marker });
+    renderCoordList();
+  }
+  function undoCoordPoint() {
+    if (coordPoints.length === 0) return;
+    var last = coordPoints.pop();
+    coordMarkersLayer.removeLayer(last.marker); renderCoordList();
+  }
+  function redrawCoordMarkers() {
+    coordMarkersLayer.clearLayers();
+    coordPoints.forEach(function(p) {
+      var marker = L.marker([p.lat, p.lng], { icon: makeCoordCheckIcon(p.no) });
+      marker.addTo(coordMarkersLayer); p.marker = marker;
+    });
+  }
+  function renderCoordList() {
+    var wrap = document.getElementById('coord-list-wrap');
+    var body = document.getElementById('coord-list-body');
+    if (coordPoints.length === 0) { wrap.style.display = 'none'; body.innerHTML = ''; return; }
+    wrap.style.display = 'block';
+    body.innerHTML = coordPoints.map(function(p) {
+      return '<tr><td>' + p.no + '</td><td>' + p.e.toFixed(2) + '</td><td>' + p.n.toFixed(2) + '</td><td>' + escapeHtml(p.note || '') + '</td><td><button class="btn-remove-coord" data-no="' + p.no + '" style="width:auto;padding:2px 6px;background:#7f1d1d;">✖</button></td></tr>';
+    }).join('');
+    body.querySelectorAll('.btn-remove-coord').forEach(function(btn) {
+      btn.addEventListener('click', function() { removeCoordPoint(parseInt(this.getAttribute('data-no'))); });
+    });
+  }
+  function removeCoordPoint(no) {
+    coordPoints = coordPoints.filter(function(p) { return p.no !== no; });
+    coordPoints.forEach(function(p, i) { p.no = i + 1; });
+    redrawCoordMarkers(); renderCoordList();
+  }
+  function clearCoordPoints() { coordPoints = []; coordMarkersLayer.clearLayers(); renderCoordList(); }
+  function downloadCoordCSV() {
+    if (coordPoints.length === 0) { showToast('ยังไม่มีจุดที่บันทึก', 'error'); return; }
+    var csv = 'PointNo,Easting,Northing,Note,Lat,Lng\n';
+    coordPoints.forEach(function(p) {
+      csv += p.no + ',' + p.e.toFixed(3) + ',' + p.n.toFixed(3) + ',"' + (p.note || '').replace(/"/g, '""') + '",' + p.lat.toFixed(6) + ',' + p.lng.toFixed(6) + '\n';
+    });
+    safeDownload(new Blob([csv], { type: 'text/csv' }), 'utm-coordinates-zone47N.csv');
+  }
+
+  /* ============================================================
+   * TRAVERSE POLYGON
+   * ============================================================ */
+  var traversePoints = [];
+  var traverseMarkersLayer = L.layerGroup().addTo(map);
+  var traversePreviewLine = null, traversePolygonFinal = null;
+  function onTraverseClick(e) {
+    var lat = e.latlng.lat, lng = e.latlng.lng;
+    var utm = latLonToUTM(lat, lng, 47);
+    var no = traversePoints.length + 1;
+    var marker = L.marker(e.latlng, {
+      icon: L.divIcon({
+        html: '<div style="position:relative;width:0;height:0;">' +
+          '<div style="position:absolute;left:0;top:0;transform:translate(-50%,-50%);font-size:22px;color:#00e5ff;line-height:1;text-shadow:0 0 3px #000, 0 0 3px #000;">✛</div>' +
+          '<div style="position:absolute;left:10px;top:-18px;background:#111827;color:#fff;font-size:11px;font-weight:700;padding:1px 6px;border-radius:3px;white-space:nowrap;box-shadow:0 1px 3px rgba(0,0,0,.6);">' + no + '</div>' +
+          '</div>', className: '', iconSize: [1, 1]
+      })
+    });
+    marker.addTo(traverseMarkersLayer);
+    traversePoints.push({ no: no, lat: lat, lng: lng, e: utm.easting, n: utm.northing, marker: marker });
+    updateTraversePreview(); renderTraverseTable();
+  }
+  function updateTraversePreview() {
+    if (traversePreviewLine) { map.removeLayer(traversePreviewLine); traversePreviewLine = null; }
+    if (traversePoints.length < 2) return;
+    traversePreviewLine = L.polyline(traversePoints.map(function(p) { return [p.lat, p.lng]; }), { color: '#00e5ff', weight: 2, dashArray: '6,4', interactive: false }).addTo(map);
+  }
+  function undoTraversePoint() {
+    if (traversePoints.length === 0) return;
+    var last = traversePoints.pop();
+    traverseMarkersLayer.removeLayer(last.marker);
+    updateTraversePreview(); renderTraverseTable();
+    if (traversePolygonFinal) { map.removeLayer(traversePolygonFinal); traversePolygonFinal = null; }
+    document.getElementById('btn-traverse-to-boundary').style.display = 'none';
+  }
+  function renderTraverseTable() {
+    var body = document.getElementById('traverse-table-body');
+    body.innerHTML = traversePoints.map(function(p) { return '<tr><td>' + p.no + '</td><td>' + p.e.toFixed(2) + '</td><td>' + p.n.toFixed(2) + '</td></tr>'; }).join('');
+    var info = document.getElementById('traverse-info');
+    if (traversePoints.length >= 3) {
+      var coords = traversePoints.map(function(p) { return [p.lng, p.lat]; });
+      coords.push(coords[0].slice());
+      try {
+        var area = turf.area(turf.polygon([coords]));
+        info.textContent = 'จำนวนจุด: ' + traversePoints.length + ' | พื้นที่โดยประมาณ: ' + formatArea(area);
+      } catch (err) { info.textContent = 'จำนวนจุด: ' + traversePoints.length; }
+    } else {
+      info.textContent = 'จำนวนจุด: ' + traversePoints.length + ' (ต้องมีอย่างน้อย 3 จุดเพื่อคำนวณพื้นที่)';
+    }
+  }
+  function finishTraverse() {
+    if (traversePoints.length < 3) { showToast('ต้องมีอย่างน้อย 3 จุดจึงจะปิดวงรอบได้', 'error'); return; }
+    if (traversePolygonFinal) { map.removeLayer(traversePolygonFinal); traversePolygonFinal = null; }
+    traversePolygonFinal = L.polygon(traversePoints.map(function(p) { return [p.lat, p.lng]; }), { color: '#00e5ff', weight: 2.5, fillColor: '#00e5ff', fillOpacity: 0.15, dashArray: '4,4', interactive: false }).addTo(map);
+    renderTraverseTable();
+    document.getElementById('btn-traverse-to-boundary').style.display = 'block';
+    if (confirm('ปิดวงรอบเรียบร้อย ✅\n\nต้องการแปลงวงรอบนี้เป็น "ขอบเขตพื้นที่ออกแบบ" ในผังหลักด้วยเลยหรือไม่?')) convertTraverseToBoundary();
+  }
+  function convertTraverseToBoundary() {
+    if (traversePoints.length < 3) { showToast('ต้องมีอย่างน้อย 3 จุดในวงรอบก่อน', 'error'); return; }
+    var latlngs = traversePoints.map(function(p) { return L.latLng(p.lat, p.lng); });
+    latlngs.push(latlngs[0]);
+    var layer = L.polyline(latlngs, lineStyles.boundary);
+    layer.feature = { type: 'Feature', properties: { type: 'boundary' } };
+    layer.bindTooltip(typeLabels['boundary'], { direction: 'top' });
+    attachLayerEvents(layer); drawnItems.addLayer(layer); updateBOQ(); pushHistory();
+    showToast('เพิ่ม "ขอบเขตพื้นที่ออกแบบ" ลงในผังหลักเรียบร้อยแล้ว ✅', 'success');
+  }
+  function clearTraverse() {
+    traversePoints = []; traverseMarkersLayer.clearLayers();
+    if (traversePreviewLine) { map.removeLayer(traversePreviewLine); traversePreviewLine = null; }
+    if (traversePolygonFinal) { map.removeLayer(traversePolygonFinal); traversePolygonFinal = null; }
+    document.getElementById('btn-traverse-to-boundary').style.display = 'none';
+    renderTraverseTable();
+  }
+  function downloadTraverseCSV() {
+    if (traversePoints.length === 0) { showToast('ยังไม่มีจุดในวงรอบ', 'error'); return; }
+    var csv = 'PointNo,Easting,Northing,Lat,Lng\n';
+    traversePoints.forEach(function(p) { csv += p.no + ',' + p.e.toFixed(3) + ',' + p.n.toFixed(3) + ',' + p.lat.toFixed(6) + ',' + p.lng.toFixed(6) + '\n'; });
+    safeDownload(new Blob([csv], { type: 'text/csv' }), 'traverse-coordinates-zone47N.csv');
+  }
+  function exportTraverseKML() {
+    if (traversePoints.length < 3) { showToast('ต้องมีอย่างน้อย 3 จุดจึงจะ export วงรอบเป็น KML ได้', 'error'); return; }
+    var coordsStr = traversePoints.map(function(p) { return p.lng.toFixed(8) + ',' + p.lat.toFixed(8) + ',0'; }).join(' ')
+      + ' ' + traversePoints[0].lng.toFixed(8) + ',' + traversePoints[0].lat.toFixed(8) + ',0';
+    var kml = '<?xml version="1.0" encoding="UTF-8"?>\n<kml xmlns="http://www.opengis.net/kml/2.2">\n<Document>\n<name>Traverse Polygon</name>\n<Placemark>\n<name>วงรอบพิกัด</name>\n<Polygon>\n<outerBoundaryIs>\n<LinearRing>\n<coordinates>' + coordsStr + '</coordinates>\n</LinearRing>\n</outerBoundaryIs>\n</Polygon>\n</Placemark>\n</Document>\n</kml>';
+    safeDownload(new Blob([kml], { type: 'application/vnd.google-earth.kml+xml' }), 'traverse-polygon.kml');
+  }
+
+  /* ============================================================
+   * KML IMPORT
+   * ============================================================ */
+  var kmlLayers = [], kmlLayerIdCounter = 0, currentReportKmlId = null;
+  function parseKMLCoordinates(text) {
+    return text.trim().split(/\s+/).map(function(tuple) {
+      var parts = tuple.split(',');
+      return L.latLng(parseFloat(parts[1]), parseFloat(parts[0]));
+    }).filter(function(ll) { return !isNaN(ll.lat) && !isNaN(ll.lng); });
+  }
+  function stripClosingDuplicate(latlngs) {
+    if (latlngs.length > 1) {
+      var first = latlngs[0], last = latlngs[latlngs.length - 1];
+      if (Math.abs(first.lat - last.lat) < 1e-9 && Math.abs(first.lng - last.lng) < 1e-9) return latlngs.slice(0, -1);
+    }
+    return latlngs;
+  }
+  function importKML(kmlText) {
+    try {
+      var parser = new DOMParser();
+      var xml = parser.parseFromString(kmlText, 'text/xml');
+      var placemarks = xml.getElementsByTagName('Placemark');
+      var importedCount = 0;
+      for (var i = 0; i < placemarks.length; i++) {
+        var pm = placemarks[i];
+        var nameEl = pm.getElementsByTagName('name')[0];
+        var name = nameEl ? nameEl.textContent.trim() : '';
+        var point = pm.getElementsByTagName('Point')[0];
+        var lineString = pm.getElementsByTagName('LineString')[0];
+        var polygon = pm.getElementsByTagName('Polygon')[0];
+        var kmlId = ++kmlLayerIdCounter;
+        if (point) {
+          var ctP = point.getElementsByTagName('coordinates')[0];
+          ctP = ctP ? ctP.textContent : null; if (!ctP) continue;
+          var llP = parseKMLCoordinates(ctP); if (llP.length === 0) continue;
+          var dnP = name || ('จุด KML #' + kmlId);
+          var m = L.marker(llP[0], { icon: iconFor('kmlPoint') });
+          m.feature = { type: 'Feature', properties: { type: 'kmlPoint', label: dnP, kmlId: kmlId, kmlVisible: true } };
+          m.bindTooltip(dnP, { direction: 'top' }); attachLayerEvents(m); drawnItems.addLayer(m);
+          kmlLayers.push({ id: kmlId, name: dnP, layer: m, geomType: 'point', visible: true });
+          importedCount++;
+        } else if (lineString) {
+          var ctL = lineString.getElementsByTagName('coordinates')[0];
+          ctL = ctL ? ctL.textContent : null; if (!ctL) continue;
+          var llL = parseKMLCoordinates(ctL); if (llL.length < 2) continue;
+          var dnL = name || ('เส้น KML #' + kmlId);
+          var ln = L.polyline(llL, lineStyles.kmlLine);
+          ln.feature = { type: 'Feature', properties: { type: 'kmlLine', label: dnL, kmlId: kmlId, kmlVisible: true } };
+          ln.bindTooltip(dnL, { direction: 'top' }); attachLayerEvents(ln); drawnItems.addLayer(ln);
+          kmlLayers.push({ id: kmlId, name: dnL, layer: ln, geomType: 'line', visible: true });
+          importedCount++;
+        } else if (polygon) {
+          var outer = polygon.getElementsByTagName('outerBoundaryIs')[0];
+          var ctG = outer ? outer.getElementsByTagName('coordinates')[0] : null;
+          ctG = ctG ? ctG.textContent : null; if (!ctG) continue;
+          var llG = parseKMLCoordinates(ctG);
+          llG = stripClosingDuplicate(llG); if (llG.length < 3) continue;
+          var dnG = name || ('พื้นที่ KML #' + kmlId);
+          var pg = L.polygon(llG, areaStyles.kmlPolygon);
+          pg.feature = { type: 'Feature', properties: { type: 'kmlPolygon', label: dnG, kmlId: kmlId, kmlVisible: true } };
+          pg.bindTooltip(dnG, { direction: 'top' }); attachLayerEvents(pg); drawnItems.addLayer(pg);
+          kmlLayers.push({ id: kmlId, name: dnG, layer: pg, geomType: 'polygon', visible: true });
+          importedCount++;
+        }
+      }
+      if (importedCount > 0) {
+        renderKmlLayersList(); pushHistory();
+        showToast('นำเข้าสำเร็จ ' + importedCount + ' รายการจากไฟล์ KML', 'success');
+      } else {
+        showToast('ไม่พบข้อมูลที่รองรับในไฟล์ KML', 'error');
+      }
+    } catch (err) {
+      showToast('ไม่สามารถอ่านไฟล์ KML ได้', 'error');
+    }
+  }
+  function geomIconFor(geomType) { return geomType === 'point' ? '📍' : geomType === 'line' ? '➖' : '⬠'; }
+  function renderKmlLayersList() {
+    var wrap = document.getElementById('kml-layers-wrap');
+    var list = document.getElementById('kml-layers-list');
+    if (kmlLayers.length === 0) { wrap.style.display = 'none'; list.innerHTML = ''; return; }
+    wrap.style.display = 'block';
+    list.innerHTML = kmlLayers.map(function(item) {
+      var checked = item.visible ? 'checked' : '';
+      var polyBtns = item.geomType === 'polygon'
+        ? '<button class="kml-report-btn" data-id="' + item.id + '" title="รายงานพิกัด+พื้นที่">📊</button>' +
+          '<button class="kml-boundary-btn" data-id="' + item.id + '" title="แปลงเป็นขอบเขต" style="background:#b91c1c;">➕</button>'
+        : '';
+      return '<div class="kml-item"><label style="display:flex;align-items:center;gap:5px;flex:1;overflow:hidden;cursor:pointer;">' +
+        '<input type="checkbox" class="kml-vis-cb" data-id="' + item.id + '" ' + checked + '>' +
+        '<span class="kml-item-name" title="' + escapeHtml(item.name) + '">' + geomIconFor(item.geomType) + ' ' + escapeHtml(item.name) + '</span></label>' +
+        '<div class="kml-actions">' + polyBtns +
+        '<button class="kml-remove-btn" data-id="' + item.id + '" title="ลบ" style="background:#7f1d1d;">✖</button></div></div>';
+    }).join('');
+    list.querySelectorAll('.kml-vis-cb').forEach(function(cb) {
+      cb.addEventListener('change', function() { toggleKmlLayerVisibility(parseInt(this.getAttribute('data-id')), this.checked); });
+    });
+    list.querySelectorAll('.kml-report-btn').forEach(function(btn) {
+      btn.addEventListener('click', function() { showKmlReport(parseInt(this.getAttribute('data-id'))); });
+    });
+    list.querySelectorAll('.kml-boundary-btn').forEach(function(btn) {
+      btn.addEventListener('click', function() { convertKmlToBoundary(parseInt(this.getAttribute('data-id'))); });
+    });
+    list.querySelectorAll('.kml-remove-btn').forEach(function(btn) {
+      btn.addEventListener('click', function() { removeKmlLayer(parseInt(this.getAttribute('data-id'))); });
+    });
+  }
+  function toggleKmlLayerVisibility(id, visible) {
+    var item = kmlLayers.find(function(k) { return k.id === id; });
+    if (!item) return;
+    item.visible = visible;
+    if (item.layer.feature) item.layer.feature.properties.kmlVisible = visible;
+    if (visible) { if (!map.hasLayer(item.layer)) item.layer.addTo(map); }
+    else { if (map.hasLayer(item.layer)) map.removeLayer(item.layer); }
+  }
+  function removeKmlLayer(id) {
+    var idx = kmlLayers.findIndex(function(k) { return k.id === id; });
+    if (idx === -1) return;
+    if (!confirm('ลบเลเยอร์ "' + kmlLayers[idx].name + '" นี้หรือไม่?')) return;
+    drawnItems.removeLayer(kmlLayers[idx].layer); kmlLayers.splice(idx, 1);
+    renderKmlLayersList(); pushHistory();
+  }
+  function convertKmlToBoundary(id) {
+    var item = kmlLayers.find(function(k) { return k.id === id; });
+    if (!item || item.geomType !== 'polygon') return;
+    var raw = item.layer.getLatLngs();
+    var ring = Array.isArray(raw[0]) ? raw[0] : raw;
+    var closed = ring.map(function(ll) { return L.latLng(ll.lat, ll.lng); });
+    closed.push(closed[0]);
+    var layer = L.polyline(closed, lineStyles.boundary);
+    layer.feature = { type: 'Feature', properties: { type: 'boundary' } };
+    layer.bindTooltip(typeLabels['boundary'], { direction: 'top' });
+    attachLayerEvents(layer); drawnItems.addLayer(layer); updateBOQ(); pushHistory();
+    showToast('แปลง "' + item.name + '" เป็นขอบเขตพื้นที่ออกแบบเรียบร้อย ✅', 'success');
+  }
+  function buildKmlReportText(id) {
+    var item = kmlLayers.find(function(k) { return k.id === id; });
+    if (!item || item.geomType !== 'polygon') return null;
+    var raw = item.layer.getLatLngs();
+    var ring = Array.isArray(raw[0]) ? raw[0] : raw;
+    var pts = ring.map(function(ll) { return L.latLng(ll.lat, ll.lng); });
+    var coordsClosed = pts.map(function(p) { return [p.lng, p.lat]; });
+    coordsClosed.push(coordsClosed[0].slice());
+    var area = 0, perimeter = 0;
+    try { area = turf.area(turf.polygon([coordsClosed])); } catch (e) {}
+    try { perimeter = turf.length(turf.lineString(coordsClosed), { units: 'meters' }); } catch (e) {}
+    var rai = area / 1600, sqWah = area / 4;
+    var text = 'รายงานข้อมูล Polygon\r\n\r\n' + item.name + '\r\n';
+    text += 'พื้นที่: ' + formatThousands(area, 2) + ' m² | ' + formatThousands(rai, 4) + ' ไร่ | ' + formatThousands(sqWah, 2) + ' ตร.ว.\r\n\r\n';
+    text += 'เส้นรอบรูป: ' + formatThousands(perimeter, 2) + ' m\r\n\r\nจำนวนจุด: ' + pts.length + ' จุด\r\n\r\n';
+    text += 'ลำดับ\tLatitude\tLongitude\tUTM Easting\tUTM Northing\r\n';
+    pts.forEach(function(p, i) {
+      var utm = latLonToUTM(p.lat, p.lng, 47);
+      text += (i + 1) + '\t' + p.lat.toFixed(6) + '\t' + p.lng.toFixed(6) + '\t' + formatThousands(utm.easting, 2) + '\t' + formatThousands(utm.northing, 2) + '\r\n';
+    });
+    return text;
+  }
+  function showKmlReport(id) {
+    var text = buildKmlReportText(id);
+    if (!text) { showToast('ไม่พบข้อมูล Polygon นี้', 'error'); return; }
+    currentReportKmlId = id;
+    document.getElementById('kml-modal-body').textContent = text;
+    document.getElementById('kml-modal').style.display = 'flex';
+  }
+  function closeKmlModal() { document.getElementById('kml-modal').style.display = 'none'; currentReportKmlId = null; }
+  function downloadKmlReportTxtFromModal() {
+    if (currentReportKmlId === null) return;
+    var text = buildKmlReportText(currentReportKmlId);
+    if (!text) return;
+    var item = kmlLayers.find(function(k) { return k.id === currentReportKmlId; });
+    var safeName = (item ? item.name : 'polygon').replace(/[^\w\u0E00-\u0E7F-]+/g, '_');
+    safeDownload(new Blob([text], { type: 'text/plain;charset=utf-8' }), 'kml-report-' + safeName + '.txt');
+  }
+
+  /* ============================================================
+   * CROSSHAIR
+   * ============================================================ */
+  var crosshairH = null, crosshairV = null;
+  function activateCrosshairCursor() {
+    var mapEl = document.getElementById('map');
+    mapEl.style.cursor = 'none';
+    crosshairH = document.createElement('div'); crosshairH.className = 'crosshair-line horizontal';
+    crosshairV = document.createElement('div'); crosshairV.className = 'crosshair-line vertical';
+    mapEl.appendChild(crosshairH); mapEl.appendChild(crosshairV);
+    mapEl.addEventListener('mousemove', onCrosshairMove);
+  }
+  function onCrosshairMove(e) {
+    var rect = document.getElementById('map').getBoundingClientRect();
+    if (crosshairH) crosshairH.style.top = (e.clientY - rect.top) + 'px';
+    if (crosshairV) crosshairV.style.left = (e.clientX - rect.left) + 'px';
+  }
+  function deactivateCrosshairCursor() {
+    var mapEl = document.getElementById('map');
+    mapEl.style.cursor = '';
+    mapEl.removeEventListener('mousemove', onCrosshairMove);
+    if (crosshairH) { crosshairH.remove(); crosshairH = null; }
+    if (crosshairV) { crosshairV.remove(); crosshairV = null; }
+  }
+
+  /* ============================================================
+   * IMAGE IMPORT & CALIBRATION
+   * ============================================================ */
+  var geoImageLayer = null, calibClickLatLngs = [];
+  function createGeoImage(dataUrl) {
+    if (geoImageLayer) { map.removeLayer(geoImageLayer); geoImageLayer = null; }
+    var img = new Image();
+    img.onload = function() {
+      var mapSize = map.getSize();
+      var mpp = metersPerPixel(map.getCenter().lat, map.getZoom());
+      var wPx = Math.min(mapSize.x * 0.5, img.width);
+      var wM = wPx * mpp, hM = wM * (img.height / img.width);
+      geoImageLayer = new L.EditableGeoImage(dataUrl, map.getCenter(), wM, hM, 0, 0.85);
+      geoImageLayer.addTo(map);
+      document.getElementById('image-controls').style.display = 'block';
+      document.getElementById('inp-rotate').value = 0;
+      document.getElementById('inp-opacity').value = 85;
+      document.getElementById('chk-image-visible').checked = true;
+      document.getElementById('chk-image-locked').checked = false;
+      document.getElementById('lock-status').textContent = '🔓 ภาพยังไม่ถูกล็อก | ใช้ปุ่ม "ภาพอยู่ด้านบน/ด้านล่าง" เพื่อปรับลำดับเลเยอร์';
+    };
+    img.src = dataUrl;
+  }
+  function startCalibrate() {
+    if (!geoImageLayer) { showToast('กรุณานำเข้าภาพก่อน', 'error'); return; }
+    if (geoImageLayer.getLocked()) { showToast('กรุณายกเลิกติ๊กล็อกภาพก่อน', 'error'); return; }
+    calibClickLatLngs = [];
+    showToast('คลิก 2 จุดบนตัวภาพที่ทราบระยะจริง', 'info');
+    activateCrosshairCursor(); map.on('click', onCalibMapClick);
+  }
+  function onCalibMapClick(e) {
+    calibClickLatLngs.push(e.latlng);
+    if (calibClickLatLngs.length === 2) {
+      map.off('click', onCalibMapClick); deactivateCrosshairCursor();
+      var distMeters = turf.distance(
+        turf.point([calibClickLatLngs[0].lng, calibClickLatLngs[0].lat]),
+        turf.point([calibClickLatLngs[1].lng, calibClickLatLngs[1].lat]),
+        { units: 'meters' }
+      );
+      var real = parseFloat(prompt('ระยะจริงระหว่าง 2 จุดนี้ (เมตร)\n(ระยะที่วัดได้บนแผนที่ปัจจุบัน ≈ ' + distMeters.toFixed(2) + ' ม.)'));
+      if (real > 0 && distMeters > 0 && geoImageLayer) {
+        var factor = real / distMeters;
+        geoImageLayer._widthMeters *= factor; geoImageLayer._heightMeters *= factor;
+        geoImageLayer._reposition();
+        showToast('✅ ปรับสเกลภาพเรียบร้อย (คูณ ' + factor.toFixed(3) + ' เท่า)', 'success');
+      }
+    }
+  }
+
+  /* ============================================================
+   * REBUILD FROM FEATURE COLLECTION
+   * ============================================================ */
+  function rebuildDrawnItemsFromFC(featuresRoot) {
+    drawnItems.clearLayers(); kmlLayers = [];
+    var allFeats = (featuresRoot && featuresRoot.features) || [];
+    var fenceFeats = allFeats.filter(function(f) { return f.properties && f.properties.type === 'fence'; });
+    var shrubGroupFeats = allFeats.filter(function(f) { return f.properties && f.properties.type === 'shrubGroup' && f.geometry.type === 'Polygon' && f.properties.customFill !== undefined; });
+    var arrowFeats = allFeats.filter(function(f) { return f.properties && f.properties.type === 'arrow'; });
+    var otherFC = {
+      type: 'FeatureCollection',
+      features: allFeats.filter(function(f) {
+        return !(f.properties && (f.properties.type === 'fence' || f.properties.type === 'arrow' || (f.properties.type === 'shrubGroup' && f.properties.customFill !== undefined)));
+      })
+    };
+    fenceFeats.forEach(function(f) {
+      var latlngs = f.geometry.coordinates.map(function(c) { return L.latLng(c[1], c[0]); });
+      var group = createFenceLayer(latlngs, fenceSpacingM, f.geometry.coordinates, f.properties.customStroke);
+      drawnItems.addLayer(group); applyGroupLineStyle(group);
+    });
+    shrubGroupFeats.forEach(function(f) {
+      var ring = f.geometry.coordinates[0];
+      var latlngs = ring.slice(0, -1).map(function(c) { return L.latLng(c[1], c[0]); });
+      var group = createShrubGroupLayer(latlngs, { fillColor: f.properties.customFill, strokeColor: f.properties.customStroke });
+      drawnItems.addLayer(group); applyGroupLineStyle(group);
+    });
+    arrowFeats.forEach(function(f) {
+      var coords = f.geometry.coordinates;
+      var p1 = L.latLng(coords[0][1], coords[0][0]), p2 = L.latLng(coords[1][1], coords[1][0]);
+      var group = createArrowLayer(p1, p2, f.properties.customStroke);
+      drawnItems.addLayer(group);
+    });
+    var maxKmlId = 0;
+    L.geoJSON(otherFC, {
+      pointToLayer: function(f, latlng) {
+        var t = f.properties.type;
+        if (['tree', 'palm', 'shrubMid', 'largeShrub'].indexOf(t) !== -1) {
+          var def = t === 'tree' ? treeDiaM : t === 'palm' ? palmDiaM : t === 'largeShrub' ? largeShrubDiaM : shrubDiaM;
+          return new L.ScaledIcon(latlng, t, f.properties.diameter || def, { rot: f.properties.rot, fillColor: f.properties.fillColor });
+        }
+        if (t === 'text') {
+          var font = f.properties.font || "'Segoe UI', sans-serif";
+          var rot = f.properties.rot || 0;
+          var color = f.properties.color || '#111111';
+          var fontSize = f.properties.fontSize || 18;
+          return L.marker(latlng, {
+            icon: L.divIcon({
+              html: '<div class="rotator-inner" style="transform:rotate(' + rot + 'deg)"><div class="map-text-label" style="font-family:' + font + '; color:' + color + '; font-size:' + fontSize + 'px;">' + escapeHtml(f.properties.label || '') + '</div></div>',
+              className: 'clean-text-icon', iconSize: [1, 1], iconAnchor: [0, 10]
+            })
+          });
+        }
+        return L.marker(latlng, { icon: iconFor(t) });
+      },
+      style: function(f) {
+        var base = areaStyles[f.properties.type] || lineStyles[f.properties.type] || {};
+        var custom = {};
+        if (f.properties.customFill) custom.fillColor = f.properties.customFill;
+        if (f.properties.customStroke) custom.color = f.properties.customStroke;
+        if (f.properties.customWeight != null) custom.weight = f.properties.customWeight;
+        if (f.properties.customOpacity != null) custom.opacity = f.properties.customOpacity;
+        var result = {};
+        for (var key in base) result[key] = base[key];
+        for (var key2 in custom) result[key2] = custom[key2];
+        return result;
+      },
+      onEachFeature: function(f, layer) {
+        layer.feature = f;
+        if (!(layer instanceof L.ScaledIcon)) attachLayerEvents(layer);
+        drawnItems.addLayer(layer);
+        if (f.properties.label && layer.bindTooltip && !layer.getTooltip()) layer.bindTooltip(f.properties.label, { direction: 'top' });
+        if (f.properties.type === 'measureLine') layer.bindTooltip(formatLength(f.properties.lengthMeters || turf.length(f, { units: 'meters' })), { permanent: true, direction: 'center', className: 'measure-label' });
+        if (f.properties.type === 'measureArea') layer.bindTooltip(formatArea(f.properties.areaSqm || turf.area(f)), { permanent: true, direction: 'center', className: 'measure-label' });
+        if (f.properties.widthMeters && layer instanceof L.Polyline) {
+          var mpp = metersPerPixel(map.getCenter().lat, map.getZoom());
+          layer.setStyle({ weight: Math.max(1, f.properties.widthMeters / mpp) });
+        }
+        if (f.properties.kmlId != null) {
+          var geomType = f.properties.type === 'kmlPoint' ? 'point' : (f.properties.type === 'kmlLine' ? 'line' : 'polygon');
+          var visible = f.properties.kmlVisible !== false;
+          kmlLayers.push({ id: f.properties.kmlId, name: f.properties.label || ('KML #' + f.properties.kmlId), layer: layer, geomType: geomType, visible: visible });
+          if (!visible && map.hasLayer(layer)) map.removeLayer(layer);
+          if (f.properties.kmlId > maxKmlId) maxKmlId = f.properties.kmlId;
+        }
+      }
+    });
+    kmlLayerIdCounter = Math.max(kmlLayerIdCounter, maxKmlId);
+    renderKmlLayersList();
+  }
+
+  /* ============================================================
+   * UNDO / REDO
+   * ============================================================ */
+  function pushHistory() {
+    if (suspendHistory) return;
+    var snap = JSON.stringify(collectFeatures());
+    if (historyIndex >= 0 && historyStack[historyIndex] === snap) return;
+    historyStack = historyStack.slice(0, historyIndex + 1);
+    historyStack.push(snap);
+    historyIndex = historyStack.length - 1;
+    if (historyStack.length > 60) { historyStack.shift(); historyIndex = historyStack.length - 1; }
+    updateUndoRedoButtons();
+  }
+  function undo() {
+    if (historyIndex <= 0) return;
+    historyIndex--;
+    suspendHistory = true;
+    rebuildDrawnItemsFromFC(JSON.parse(historyStack[historyIndex]));
+    Object.keys(typeVisibility).forEach(function(t) { if (typeVisibility[t] === false) toggleTypeVisibility(t, false); });
+    suspendHistory = false;
+    updateBOQ(); updateUndoRedoButtons();
+    deselectMoveTarget(); deselectColorTarget(); deselectLineStyleTarget(); deselectTextSizeTarget();
+  }
+  function redo() {
+    if (historyIndex >= historyStack.length - 1) return;
+    historyIndex++;
+    suspendHistory = true;
+    rebuildDrawnItemsFromFC(JSON.parse(historyStack[historyIndex]));
+    Object.keys(typeVisibility).forEach(function(t) { if (typeVisibility[t] === false) toggleTypeVisibility(t, false); });
+    suspendHistory = false;
+    updateBOQ(); updateUndoRedoButtons();
+    deselectMoveTarget(); deselectColorTarget(); deselectLineStyleTarget(); deselectTextSizeTarget();
+  }
+  function updateUndoRedoButtons() {
+    var u = document.getElementById('btn-undo'), r = document.getElementById('btn-redo');
+    if (u) u.disabled = historyIndex <= 0;
+    if (r) r.disabled = historyIndex >= historyStack.length - 1;
+  }
+
+  /* ============================================================
+   * SAVE / LOAD JSON
+   * ============================================================ */
+  function collectFeatures() {
+    var feats = [];
+    drawnItems.eachLayer(function(layer) {
+      if (layer._isFenceGroup || layer._isShrubGroup || layer._isArrowGroup) feats.push(layer.feature);
+      else if (layer.toGeoJSON) {
+        var f = layer.toGeoJSON();
+        if (layer.feature && layer.feature.properties) f.properties = layer.feature.properties;
+        feats.push(f);
+      }
+    });
+    return { type: 'FeatureCollection', features: feats };
+  }
+
+  /* ============================================================
+   * EXPORT FUNCTIONS
+   * ============================================================ */
+  function exportPNG() {
+    map.invalidateSize();
+    showToast('กำลังสร้างภาพ HD...', 'info');
+    setTimeout(function() {
+      html2canvas(document.getElementById('map'), { useCORS: true, allowTaint: true, scale: 3, logging: false, imageTimeout: 15000 })
+        .then(function(canvas) {
+          canvas.toBlob(function(blob) {
+            safeDownload(blob, 'landscape-map-HD.png');
+            showToast('ดาวน์โหลดภาพ HD สำเร็จ ✅', 'success');
+          });
+        }).catch(function() { showToast('เกิดข้อผิดพลาดในการสร้างภาพ', 'error'); });
+    }, 300);
+  }
+  function renderHtmlToImage(html, widthPx) {
+    var holder = document.createElement('div');
+    holder.style.position = 'fixed'; holder.style.left = '-99999px'; holder.style.top = '0';
+    holder.style.background = '#ffffff'; holder.style.padding = '16px'; holder.style.width = widthPx + 'px';
+    holder.innerHTML = html;
+    document.body.appendChild(holder);
+    return new Promise(function(resolve) { setTimeout(resolve, 120); })
+      .then(function() { return html2canvas(holder, { backgroundColor: '#ffffff', scale: 2, useCORS: true }); })
+      .then(function(canvas) { document.body.removeChild(holder); return canvas; });
+  }
+  function exportPDF() {
+    map.invalidateSize();
+    showToast('กำลังสร้าง PDF...', 'info');
+    return new Promise(function(resolve) { setTimeout(resolve, 300); })
+      .then(function() {
+        return html2canvas(document.getElementById('map'), { useCORS: true, allowTaint: true, scale: 2, logging: false, imageTimeout: 15000 });
+      })
+      .then(function(mapCanvas) {
+        var titleText = document.getElementById('inp-title').value;
+        return renderHtmlToImage('<div style="font-family:\'Mali\',sans-serif; font-size:28px; font-weight:700; color:#111;">' + escapeHtml(titleText) + '</div>', 900)
+          .then(function(titleCanvas) {
+            var boqRows = '';
+            var pdfRows = getBOQData(false);
+            pdfRows.forEach(function(r) {
+              if (r.isSection) return;
+              boqRows += '<tr>' +
+                '<td style="padding:6px 10px;border:1px solid #999;text-align:center;color:#111111;background:#fff;">' + r.no + '</td>' +
+                '<td style="padding:6px 10px;border:1px solid #999;color:#111111;background:#fff;">' + escapeHtml(r.label) + '</td>' +
+                '<td style="padding:6px 10px;border:1px solid #999;text-align:right;color:#111111;background:#fff;">' + r.qty + '</td>' +
+                '<td style="padding:6px 10px;border:1px solid #999;color:#111111;background:#fff;">' + r.unit + '</td></tr>';
+            });
+            var boqHtml = '<div style="font-family:\'Mali\',sans-serif;background:#fff;">' +
+              '<div style="font-size:22px;font-weight:700;margin-bottom:12px;color:#111111;">ตาราง Bill of Quantities (BOQ) — ' + escapeHtml(titleText) + '</div>' +
+              '<table style="border-collapse:collapse;width:100%;font-size:15px;color:#111111;background:#fff;">' +
+              '<thead><tr style="background:#eef2f7;">' +
+              '<th style="padding:6px 10px;border:1px solid #999;text-align:center;color:#111111;background:#eef2f7;">ลำดับ</th>' +
+              '<th style="padding:6px 10px;border:1px solid #999;text-align:left;color:#111111;background:#eef2f7;">รายการ</th>' +
+              '<th style="padding:6px 10px;border:1px solid #999;text-align:right;color:#111111;background:#eef2f7;">ปริมาณ</th>' +
+              '<th style="padding:6px 10px;border:1px solid #999;text-align:left;color:#111111;background:#eef2f7;">หน่วย</th>' +
+              '</tr></thead><tbody>' + (boqRows || '<tr><td colspan="4" style="padding:10px;text-align:center;color:#888;background:#fff;">ยังไม่มีข้อมูล</td></tr>') + '</tbody></table></div>';
+            return renderHtmlToImage(boqHtml, 900).then(function(boqCanvas) {
+              var jsPDF = window.jspdf.jsPDF;
+              var pdf = new jsPDF({ orientation: 'landscape', unit: 'mm', format: 'a3' });
+              var pageW = pdf.internal.pageSize.getWidth(), pageH = pdf.internal.pageSize.getHeight();
+              var titleImgH = 12, titleImgW = titleImgH * (titleCanvas.width / titleCanvas.height);
+              pdf.addImage(titleCanvas.toDataURL('image/png'), 'PNG', 10, 8, Math.min(titleImgW, pageW - 20), titleImgH);
+              var mw = pageW - 20, mh = mw * (mapCanvas.height / mapCanvas.width);
+              var maxMh = pageH - 30;
+              if (mh > maxMh) { mh = maxMh; mw = mh / (mapCanvas.height / mapCanvas.width); }
+              pdf.addImage(mapCanvas.toDataURL('image/png'), 'PNG', 10, 24, mw, mh);
+              pdf.addPage();
+              var bw = pageW - 20, bh = bw * (boqCanvas.height / boqCanvas.width);
+              if (bh > pageH - 20) { bh = pageH - 20; bw = bh / (boqCanvas.height / boqCanvas.width); }
+              pdf.addImage(boqCanvas.toDataURL('image/png'), 'PNG', 10, 10, bw, bh);
+              pdf.save('landscape-plan.pdf');
+              showToast('ดาวน์โหลด PDF สำเร็จ ✅', 'success');
+            });
+          });
+      }).catch(function() { showToast('เกิดข้อผิดพลาดในการสร้าง PDF', 'error'); });
+  }
+
+  /* ============================================================
+   * EVENT BINDINGS
+   * ============================================================ */
+  function bindAllEvents() {
+    document.getElementById('btn-toggle-sidebar').addEventListener('click', function() {
+      var sb = document.getElementById('sidebar');
+      sb.classList.toggle('collapsed');
+      this.textContent = sb.classList.contains('collapsed') ? '☰' : '✕';
+      setTimeout(function() { map.invalidateSize(); }, 260);
+    });
+    document.getElementById('btn-basemap-sat').addEventListener('click', function() { switchBasemap('sat'); });
+    document.getElementById('btn-basemap-topo').addEventListener('click', function() { switchBasemap('topo'); });
+    document.getElementById('btn-search-place').addEventListener('click', searchPlace);
+    document.getElementById('inp-search-place').addEventListener('keydown', function(e) { if (e.key === 'Enter') { e.preventDefault(); searchPlace(); } });
+
+    document.getElementById('btn-save-json').addEventListener('click', function() {
+      var data = {
+        view: { lat: map.getCenter().lat, lng: map.getCenter().lng, zoom: map.getZoom() },
+        features: collectFeatures(), fenceSpacing: fenceSpacingM,
+        visibility: typeVisibility, title: document.getElementById('inp-title').value,
+        image: geoImageLayer ? {
+          url: geoImageLayer._url, lat: geoImageLayer._latlng.lat, lng: geoImageLayer._latlng.lng,
+          w: geoImageLayer._widthMeters, h: geoImageLayer._heightMeters, rot: geoImageLayer._rotation,
+          opacity: geoImageLayer._opacity, locked: geoImageLayer.getLocked(),
+          useFrontPane: geoImageLayer._useFrontPane
+        } : null
+      };
+      safeDownload(new Blob([JSON.stringify(data)], { type: 'application/json' }), 'landscape-plan.json');
+    });
+    document.getElementById('inp-load-json').addEventListener('change', function(e) {
+      var file = e.target.files[0]; if (!file) return;
+      var reader = new FileReader();
+      reader.onload = function(ev) {
+        try {
+          var data = JSON.parse(ev.target.result);
+          typeVisibility = data.visibility || {};
+          if (data.title) document.getElementById('inp-title').value = data.title;
+          if (geoImageLayer) { map.removeLayer(geoImageLayer); geoImageLayer = null; }
+          map.setView([data.view.lat, data.view.lng], data.view.zoom);
+          if (data.fenceSpacing) { fenceSpacingM = data.fenceSpacing; document.getElementById('inp-fence-spacing').value = fenceSpacingM; }
+          rebuildDrawnItemsFromFC(data.features);
+          if (data.image) {
+            geoImageLayer = new L.EditableGeoImage(data.image.url, [data.image.lat, data.image.lng], data.image.w, data.image.h, data.image.rot, data.image.opacity || 0.85);
+            if (data.image.useFrontPane === false) geoImageLayer.setZOrder(false);
+            geoImageLayer.addTo(map); geoImageLayer.setLocked(!!data.image.locked);
+            document.getElementById('image-controls').style.display = 'block';
+            document.getElementById('inp-opacity').value = Math.round((data.image.opacity || 0.85) * 100);
+            document.getElementById('inp-rotate').value = data.image.rot || 0;
+            document.getElementById('chk-image-visible').checked = true;
+            document.getElementById('chk-image-locked').checked = !!data.image.locked;
+            document.getElementById('lock-status').textContent = data.image.locked ? '🔒 ภาพถูกล็อกตำแหน่งแล้ว' : '🔓 ภาพยังไม่ถูกล็อก | ใช้ปุ่ม "ภาพอยู่ด้านบน/ด้านล่าง" เพื่อปรับลำดับเลเยอร์';
+          }
+          updateBOQ();
+          Object.keys(typeVisibility).forEach(function(t) { if (typeVisibility[t] === false) toggleTypeVisibility(t, false); });
+          historyStack = [JSON.stringify(collectFeatures())]; historyIndex = 0;
+          updateUndoRedoButtons();
+          showToast('โหลดผังสำเร็จ ✅', 'success');
+        } catch (err) { showToast('ไม่สามารถอ่านไฟล์ JSON ได้', 'error'); }
+      };
+      reader.readAsText(file);
+    });
+
+    document.getElementById('inp-kml-file').addEventListener('change', function(e) {
+      var file = e.target.files[0]; if (!file) return;
+      var reader = new FileReader();
+      reader.onload = function(ev) { importKML(ev.target.result); };
+      reader.readAsText(file); e.target.value = '';
+    });
+    document.getElementById('inp-image-file').addEventListener('change', function(e) {
+      var file = e.target.files[0]; if (!file) return;
+      var reader = new FileReader();
+      reader.onload = function(ev) { createGeoImage(ev.target.result); };
+      reader.readAsDataURL(file); e.target.value = '';
+    });
+    document.getElementById('inp-rotate').addEventListener('input', function() { if (geoImageLayer) { geoImageLayer._rotation = parseFloat(this.value); geoImageLayer._reposition(); } });
+    document.getElementById('inp-opacity').addEventListener('input', function() { if (geoImageLayer) geoImageLayer.setOpacity(this.value / 100); });
+    document.getElementById('chk-image-visible').addEventListener('change', function() {
+      if (!geoImageLayer) return;
+      if (this.checked) { if (!map.hasLayer(geoImageLayer)) geoImageLayer.addTo(map); }
+      else { if (map.hasLayer(geoImageLayer)) map.removeLayer(geoImageLayer); }
+    });
+    document.getElementById('chk-image-locked').addEventListener('change', function() {
+      if (!geoImageLayer) return;
+      geoImageLayer.setLocked(this.checked);
+      document.getElementById('lock-status').textContent = this.checked ? '🔒 ภาพถูกล็อกตำแหน่งแล้ว' : '🔓 ภาพยังไม่ถูกล็อก | ใช้ปุ่ม "ภาพอยู่ด้านบน/ด้านล่าง" เพื่อปรับลำดับเลเยอร์';
+    });
+    document.getElementById('btn-calibrate').addEventListener('click', startCalibrate);
+    document.getElementById('btn-image-to-front').addEventListener('click', function() {
+      if (!geoImageLayer) { showToast('กรุณานำเข้าภาพก่อน', 'error'); return; }
+      geoImageLayer.setZOrder(true);
+      showToast('✅ นำภาพมาอยู่ด้านบน KML แล้ว (สามารถลาก/ย้ายได้)', 'success');
+    });
+    document.getElementById('btn-image-to-back').addEventListener('click', function() {
+      if (!geoImageLayer) { showToast('กรุณานำเข้าภาพก่อน', 'error'); return; }
+      geoImageLayer.setZOrder(false);
+      showToast('✅ ส่งภาพไปอยู่ด้านหลัง KML แล้ว', 'info');
+    });
+
+    document.getElementById('inp-road-width').addEventListener('input', function() { roadWidthM = parseFloat(this.value) || 4; });
+    document.getElementById('inp-path-width').addEventListener('input', function() { pathWidthM = parseFloat(this.value) || 2; });
+    document.getElementById('inp-tree-dia').addEventListener('input', function() { treeDiaM = parseFloat(this.value) || 8; });
+    document.getElementById('inp-palm-dia').addEventListener('input', function() { palmDiaM = parseFloat(this.value) || 4.5; });
+    document.getElementById('inp-shrub-dia').addEventListener('input', function() { shrubDiaM = parseFloat(this.value) || 4.5; });
+    document.getElementById('inp-large-shrub-dia').addEventListener('input', function() { largeShrubDiaM = parseFloat(this.value) || 6; });
+    document.getElementById('inp-fence-spacing').addEventListener('input', function() { fenceSpacingM = parseFloat(this.value) || 2; });
+
+    document.getElementById('btn-tree').addEventListener('click', function() { startTool('marker', 'tree'); });
+    document.getElementById('btn-palm').addEventListener('click', function() { startTool('marker', 'palm'); });
+    document.getElementById('btn-shrub-mid').addEventListener('click', function() { startTool('marker', 'shrubMid'); });
+    document.getElementById('btn-large-shrub').addEventListener('click', function() { startTool('marker', 'largeShrub'); });
+
+    document.getElementById('btn-shrub-group').addEventListener('click', function() { startTool('polygon', 'shrubGroup'); });
+    document.getElementById('btn-planting').addEventListener('click', function() { startTool('polygon', 'planting'); });
+    document.getElementById('btn-lawn').addEventListener('click', function() { startTool('polygon', 'lawn'); });
+    document.getElementById('btn-gravel').addEventListener('click', function() { startTool('polygon', 'gravel'); });
+    document.getElementById('btn-water').addEventListener('click', function() { startTool('polygon', 'water'); });
+    document.getElementById('btn-hardscape').addEventListener('click', function() { startTool('polygon', 'hardscape'); });
+    document.getElementById('btn-deck').addEventListener('click', function() { startTool('polygon', 'deck'); });
+    document.getElementById('btn-building').addEventListener('click', function() { startTool('rectangle', 'building'); });
+
+    document.getElementById('btn-path').addEventListener('click', function() { startTool('line', 'path'); });
+    document.getElementById('btn-road').addEventListener('click', function() { startTool('line', 'road'); });
+    document.getElementById('btn-fence').addEventListener('click', function() { startTool('line', 'fence'); });
+    document.getElementById('btn-boundary').addEventListener('click', function() { startTool('line', 'boundary'); });
+
+    document.getElementById('btn-undo').addEventListener('click', undo);
+    document.getElementById('btn-redo').addEventListener('click', redo);
+    document.getElementById('btn-pan').addEventListener('click', activatePan);
+    document.getElementById('btn-move').addEventListener('click', activateMove);
+    document.getElementById('btn-color').addEventListener('click', activateColor);
+    document.getElementById('btn-shape-edit').addEventListener('click', activateShapeEdit);
+    document.getElementById('btn-text-edit').addEventListener('click', activateTextEdit);
+    document.getElementById('btn-text-size').addEventListener('click', activateTextSizeTool);
+    document.getElementById('btn-line-style').addEventListener('click', activateLineStyleTool);
+    document.getElementById('btn-arrow').addEventListener('click', startArrowTool);
+    document.getElementById('btn-free-line').addEventListener('click', function() { startTool('line', 'freeLine'); });
+    document.getElementById('btn-measure-line').addEventListener('click', function() { startTool('measureLine'); });
+    document.getElementById('btn-measure-area').addEventListener('click', function() { startTool('measureArea'); });
+    document.getElementById('btn-free-polygon').addEventListener('click', function() { startTool('freePolygon'); });
+
+    document.getElementById('btn-deselect-move').addEventListener('click', deselectMoveTarget);
+    document.getElementById('inp-object-rotate').addEventListener('input', function() {
+      if (!selectedLayer) return;
+      var angle = parseFloat(this.value);
+      if (selectedLayer instanceof L.ScaledIcon) { selectedLayer._rot = angle; selectedLayer._reposition(); return; }
+      if (selectedLayer instanceof L.Marker) {
+        var el = selectedLayer.getElement();
+        var inner = el && el.querySelector('.rotator-inner');
+        if (inner) inner.style.transform = 'rotate(' + angle + 'deg)';
+        if (selectedLayer.feature) selectedLayer.feature.properties.rot = angle;
+        return;
+      }
+      if (selectedLayer._isFenceGroup && selectedBaseGeoJSON) {
+        var prevColor = selectedLayer.feature.properties.customStroke;
+        var centroid = turf.centroid(selectedBaseGeoJSON);
+        var rotated = turf.transformRotate(selectedBaseGeoJSON, angle, { pivot: centroid });
+        var coords = rotated.geometry.coordinates;
+        var newLatLngs = coords.map(function(c) { return L.latLng(c[1], c[0]); });
+        drawnItems.removeLayer(selectedLayer);
+        var newGroup = createFenceLayer(newLatLngs, fenceSpacingM, coords, prevColor);
+        drawnItems.addLayer(newGroup); selectedLayer = newGroup; updateBOQ(); return;
+      }
+      if (selectedLayer._isShrubGroup && selectedBaseGeoJSON) {
+        var prevFill = selectedLayer.feature.properties.customFill, prevStroke = selectedLayer.feature.properties.customStroke;
+        var centroid2 = turf.centroid(selectedBaseGeoJSON);
+        var rotated2 = turf.transformRotate(selectedBaseGeoJSON, angle, { pivot: centroid2 });
+        var ring2 = rotated2.geometry.coordinates[0];
+        var newLatLngs2 = ring2.slice(0, -1).map(function(c) { return L.latLng(c[1], c[0]); });
+        drawnItems.removeLayer(selectedLayer);
+        var newGroup2 = createShrubGroupLayer(newLatLngs2, { fillColor: prevFill, strokeColor: prevStroke });
+        drawnItems.addLayer(newGroup2); selectedLayer = newGroup2; updateBOQ(); return;
+      }
+      if (selectedLayer._isArrowGroup && selectedBaseGeoJSON) {
+        var prevColorA = selectedLayer.feature.properties.customStroke;
+        var centroidA = turf.centroid(selectedBaseGeoJSON);
+        var rotatedA = turf.transformRotate(selectedBaseGeoJSON, angle, { pivot: centroidA });
+        var coordsA = rotatedA.geometry.coordinates;
+        var p1 = L.latLng(coordsA[0][1], coordsA[0][0]), p2 = L.latLng(coordsA[1][1], coordsA[1][0]);
+        drawnItems.removeLayer(selectedLayer);
+        var newGroupA = createArrowLayer(p1, p2, prevColorA);
+        drawnItems.addLayer(newGroupA); selectedLayer = newGroupA; updateBOQ(); return;
+      }
+      if (selectedBaseGeoJSON) {
+        var centroidG = turf.centroid(selectedBaseGeoJSON);
+        var rotatedG = turf.transformRotate(selectedBaseGeoJSON, angle, { pivot: centroidG });
+        applyGeoJSONToLayer(selectedLayer, rotatedG);
+      }
+    });
+    document.getElementById('inp-object-rotate').addEventListener('change', function() { pushHistory(); });
+
+    document.getElementById('btn-deselect-color').addEventListener('click', deselectColorTarget);
+    document.getElementById('inp-color-fill').addEventListener('input', function() {
+      if (!selectedColorLayer) return;
+      var val = this.value, mode = colorModeFor(selectedColorLayer);
+      if (mode === 'icon') selectedColorLayer.setFillColor(val);
+      else if (mode === 'text') applyTextColor(selectedColorLayer, val);
+      else if (mode === 'fillstroke') { selectedColorLayer.setStyle({ fillColor: val }); if (selectedColorLayer.feature) selectedColorLayer.feature.properties.customFill = val; }
+      else if (mode === 'shrubgroupfill') { selectedColorLayer._mainPolygon.setStyle({ fillColor: val }); selectedColorLayer.feature.properties.customFill = val; }
+    });
+    document.getElementById('inp-color-fill').addEventListener('change', function() { pushHistory(); });
+    document.getElementById('inp-color-stroke').addEventListener('input', function() {
+      if (!selectedColorLayer) return;
+      var val = this.value, mode = colorModeFor(selectedColorLayer);
+      if (mode === 'fillstroke' || mode === 'stroke') { selectedColorLayer.setStyle({ color: val }); if (selectedColorLayer.feature) selectedColorLayer.feature.properties.customStroke = val; }
+      else if (mode === 'fence') updateFenceColor(selectedColorLayer, val);
+      else if (mode === 'shrubgroupfill') { selectedColorLayer.eachLayer(function(l) { l.setStyle({ color: val }); }); selectedColorLayer.feature.properties.customStroke = val; }
+      else if (mode === 'arrow') updateArrowColor(selectedColorLayer, val);
+    });
+    document.getElementById('inp-color-stroke').addEventListener('change', function() { pushHistory(); });
+
+    document.getElementById('btn-deselect-line-style').addEventListener('click', deselectLineStyleTarget);
+    document.getElementById('inp-line-weight').addEventListener('input', function() {
+      if (!selectedLineStyleLayer) return;
+      var w = parseFloat(this.value);
+      if (selectedLineStyleMode === 'line') {
+        selectedLineStyleLayer.setStyle({ weight: w });
+        if (selectedLineStyleLayer.feature) selectedLineStyleLayer.feature.properties.customWeight = w;
+      } else {
+        selectedLineStyleLayer.eachLayer(function(l) { l.setStyle({ weight: w }); });
+        if (selectedLineStyleLayer.feature) selectedLineStyleLayer.feature.properties.customWeight = w;
+      }
+    });
+    document.getElementById('inp-line-weight').addEventListener('change', function() { pushHistory(); });
+    document.getElementById('inp-line-opacity').addEventListener('input', function() {
+      if (!selectedLineStyleLayer) return;
+      var op = parseFloat(this.value) / 100;
+      if (selectedLineStyleMode === 'line') {
+        selectedLineStyleLayer.setStyle({ opacity: op });
+        if (selectedLineStyleLayer.feature) selectedLineStyleLayer.feature.properties.customOpacity = op;
+      } else {
+        selectedLineStyleLayer.eachLayer(function(l) { l.setStyle({ opacity: op }); });
+        if (selectedLineStyleLayer.feature) selectedLineStyleLayer.feature.properties.customOpacityLine = op;
+      }
+    });
+    document.getElementById('inp-line-opacity').addEventListener('change', function() { pushHistory(); });
+
+    document.getElementById('btn-deselect-text-size').addEventListener('click', deselectTextSizeTarget);
+    document.getElementById('inp-text-size').addEventListener('input', function() {
+      if (!selectedTextSizeLayer) return;
+      var sz = parseInt(this.value);
+      var el = selectedTextSizeLayer.getElement();
+      var lbl = el && el.querySelector('.map-text-label');
+      if (lbl) lbl.style.fontSize = sz + 'px';
+      if (selectedTextSizeLayer.feature) selectedTextSizeLayer.feature.properties.fontSize = sz;
+    });
+    document.getElementById('inp-text-size').addEventListener('change', function() { pushHistory(); });
+
+    document.getElementById('btn-text').addEventListener('click', function() { startTool('text'); });
+    document.getElementById('btn-pen').addEventListener('click', function() { startTool('pen'); });
+    document.getElementById('btn-eraser').addEventListener('click', function() {
+      stopTool(); currentTool = { kind: 'eraser' };
+      document.querySelectorAll('#sidebar button').forEach(function(b) { b.classList.remove('active'); });
+      document.getElementById('btn-eraser').classList.add('active');
+      map.getContainer().style.cursor = 'crosshair';
+    });
+    document.getElementById('btn-clear-all').addEventListener('click', clearAll);
+    document.getElementById('btn-download-boq').addEventListener('click', downloadBOQText);
+    document.getElementById('btn-export-png').addEventListener('click', exportPNG);
+    document.getElementById('btn-export-pdf').addEventListener('click', exportPDF);
+
+    document.getElementById('btn-coord-check').addEventListener('click', activateCoordCheck);
+    document.getElementById('btn-undo-coord').addEventListener('click', undoCoordPoint);
+    document.getElementById('btn-clear-coord').addEventListener('click', clearCoordPoints);
+    document.getElementById('btn-download-coord-csv').addEventListener('click', downloadCoordCSV);
+    document.getElementById('btn-traverse-mode').addEventListener('click', activateTraverseMode);
+    document.getElementById('btn-undo-traverse').addEventListener('click', undoTraversePoint);
+    document.getElementById('btn-finish-traverse').addEventListener('click', finishTraverse);
+    document.getElementById('btn-traverse-to-boundary').addEventListener('click', convertTraverseToBoundary);
+    document.getElementById('btn-clear-traverse').addEventListener('click', clearTraverse);
+    document.getElementById('btn-download-traverse-csv').addEventListener('click', downloadTraverseCSV);
+    document.getElementById('btn-export-traverse-kml').addEventListener('click', exportTraverseKML);
+
+    document.getElementById('btn-close-kml-modal').addEventListener('click', closeKmlModal);
+    document.getElementById('btn-download-kml-report').addEventListener('click', downloadKmlReportTxtFromModal);
+
+    document.addEventListener('keydown', function(e) {
+      if (e.key === 'Escape') {
+        stopTool(); currentTool = null;
+        document.querySelectorAll('#sidebar button').forEach(function(b) { b.classList.remove('active'); });
+      }
+      var key = e.key.toLowerCase();
+      if ((e.ctrlKey || e.metaKey) && key === 'z' && !e.shiftKey) { e.preventDefault(); undo(); }
+      else if ((e.ctrlKey || e.metaKey) && (key === 'y' || (key === 'z' && e.shiftKey))) { e.preventDefault(); redo(); }
+    });
+  }
+
+  function init() {
+    buildPresetRow('fill-presets', 'inp-color-fill');
+    buildPresetRow('stroke-presets', 'inp-color-stroke');
+    bindAllEvents();
+    pushHistory();
+    updateUndoRedoButtons();
+  }
+  init();
+
+})();
+</script>
+</body>
+</html>
