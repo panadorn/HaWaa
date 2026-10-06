@@ -1,0 +1,1084 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Drone Mission Planner - Waypoint & Litchi Export</title>
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"
+      integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY=" crossorigin="">
+<!--
+  สรุปการปรับปรุงหลัก
+  1) ตัด localStorage/Autosave/คลังในเครื่อง (ไม่อนุญาตใน sandbox) แทนด้วย "บันทึก/เปิดโปรเจกต์" เป็นไฟล์ JSON
+  2) แก้ Litchi CSV: คอลัมน์ action เดิมขาดไป 1 คู่ ทำให้คอลัมน์เหลื่อม ตอนนี้สร้าง 15 คู่ครบ (รวม 46 คอลัมน์)
+  3) UTM คำนวณโซนอัตโนมัติ (เดิมล็อก 47N) ทำให้พื้นที่/พิกัดถูกต้องทั่วประเทศ
+  4) ไม่ใช้ alert/confirm (ถูกบล็อกใน sandbox) ใช้กล่องยืนยันและแบนเนอร์ในหน้าแทน
+  5) ไม่ใช้ inline onclick ใช้ event delegation ภายใน IIFE ไม่มีตัวแปร global
+  6) แก้บั๊ก: ระยะเวลา Track เพี้ยนหลังหยุดบันทึก, คลิกหลังลากภาพ Overlay เพิ่ม waypoint โดยไม่ตั้งใจ,
+     แจ้งเตือนซ้ำเมื่อเพิ่มจุด, input ใน waypoint เสียโฟกัสเพราะ re-render, เข็มทิศไม่หมุนตามอุปกรณ์
+-->
+<style>
+  :root{--bg:#1e293b;--bg2:#334155;--bg3:#0f172a;--tx:#e2e8f0;--mut:#94a3b8;--pri:#38bdf8;--ok:#22c55e;--warn:#f59e0b;--bad:#ef4444}
+  *{box-sizing:border-box}
+  html,body{margin:0;height:100%}
+  [hidden]{display:none!important}
+  body{font-family:"Segoe UI",Tahoma,sans-serif;display:flex;height:100vh;height:100dvh;overflow:hidden;background:var(--bg3);color:var(--tx)}
+  #map{flex:1;min-width:0;height:100%}
+  #panel{width:clamp(320px,30vw,420px);flex-shrink:0;background:var(--bg);padding:14px;overflow-y:auto}
+  h2{font-size:18px;margin:0 0 8px;color:var(--pri)}
+  h3{font-size:14px;margin:0;color:var(--pri)}
+  #status{font-size:12px;color:#86efac;margin-bottom:10px;min-height:16px}
+  .row{display:flex;gap:6px;flex-wrap:wrap;align-items:center}
+  .toolbar{display:flex;flex-wrap:wrap;gap:6px;margin-bottom:10px}
+  button{background:var(--pri);color:var(--bg3);border:0;padding:8px 10px;border-radius:6px;cursor:pointer;font-size:13px;font-weight:600}
+  button:hover{filter:brightness(.9)}
+  button:focus-visible,summary:focus-visible,input:focus-visible,select:focus-visible{outline:2px solid #facc15;outline-offset:2px}
+  button.secondary{background:#475569;color:#fff}
+  button.danger{background:var(--bad);color:#fff}
+  button.gps{background:var(--ok);color:#fff}
+  button.track{background:#a855f7;color:#fff}
+  button.goto{background:var(--warn);color:#000}
+  button.block{width:100%}
+  input[type=number],input[type=text],select{padding:5px 6px;border-radius:4px;border:1px solid #475569;background:var(--bg3);color:var(--tx);font-size:12px;min-width:0}
+  input[type=range]{flex:1;min-width:80px}
+  label{font-size:12px;color:var(--mut)}
+
+  .box,details{background:var(--bg3);border:1px solid var(--bg2);border-radius:10px;padding:10px;margin-bottom:10px}
+  summary{cursor:pointer;font-weight:700;color:#7dd3fc;font-size:13px}
+  details[open] summary{margin-bottom:8px}
+  .box.grid{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+  .box.grid label{display:flex;flex-direction:column;gap:3px}
+  .info{background:var(--bg2);border-radius:8px;padding:10px;margin-bottom:10px;font-size:12px}
+  .info .title{color:#86efac;font-weight:700;margin-bottom:4px;display:flex;justify-content:space-between}
+  .nav-row{font-size:12px;margin-bottom:4px;display:flex;justify-content:space-between;gap:8px}
+  .nav-row b{color:#facc15;text-align:right}
+  .hint{font-size:11px;color:var(--mut);margin:6px 0 0}
+
+  /* Banner & Modal */
+  .banner{position:fixed;top:16px;left:50%;transform:translateX(-50%);padding:12px 24px;border-radius:10px;font-weight:700;color:#fff;z-index:9999;box-shadow:0 4px 20px rgba(0,0,0,.5);max-width:92vw;text-align:center}
+  .banner.warn{background:#b45309}
+  .banner.alert{background:var(--bad);animation:pulse .6s ease-in-out infinite alternate}
+  @keyframes pulse{from{transform:translateX(-50%) scale(1)}to{transform:translateX(-50%) scale(1.05)}}
+  .modal{position:fixed;inset:0;background:rgba(0,0,0,.6);display:flex;align-items:center;justify-content:center;z-index:10000;padding:16px}
+  .modal-card{background:var(--bg);border:1px solid var(--pri);border-radius:12px;padding:18px;max-width:380px;width:100%}
+  .modal-card p{margin:0 0 14px;line-height:1.5;font-size:14px}
+  .modal-card .row{justify-content:flex-end}
+
+  /* Waypoint list */
+  .wp-item{background:var(--bg2);border-radius:8px;padding:10px;margin-bottom:8px;border:2px solid transparent}
+  .wp-item.selected{border-color:var(--warn)}
+  .wp-title{font-weight:700;color:#facc15;margin-bottom:6px;display:flex;justify-content:space-between;align-items:center;gap:6px;flex-wrap:wrap}
+  .badge{background:var(--ok);color:#000;font-size:10px;padding:2px 6px;border-radius:4px;margin-left:6px}
+  .wp-utm{font-size:11px;color:#7dd3fc;margin-bottom:6px;background:var(--bg);padding:4px 6px;border-radius:4px}
+  .wp-row{display:flex;gap:6px;margin-bottom:6px;align-items:center}
+  .wp-row span{width:110px;flex-shrink:0;color:var(--mut);font-size:12px}
+  .wp-row input,.wp-row select{flex:1}
+  .wp-row input[type=checkbox]{flex:0;width:16px;height:16px}
+  .wp-actions{display:flex;gap:4px;margin-top:6px;flex-wrap:wrap}
+  .wp-actions button{flex:1;padding:5px;font-size:11px;min-width:60px}
+  .empty{color:#64748b;font-size:13px;text-align:center;margin:24px 0}
+
+  /* Map icons */
+  .wp-pin{background:var(--bad);border:2px solid #fff;border-radius:50%;color:#fff;font-weight:700;text-align:center;line-height:24px;box-shadow:0 0 4px rgba(0,0,0,.5)}
+  .wp-pin.target{background:var(--warn)}
+  .gps-dot{background:#2563eb;border:3px solid #fff;border-radius:50%;box-shadow:0 0 8px rgba(37,99,235,.8)}
+  .overlay-img{position:absolute;pointer-events:none;touch-action:none;max-width:none!important;max-height:none!important;user-select:none;-webkit-user-drag:none}
+
+  /* Compass */
+  .compass-wrap{width:140px;height:140px;margin:8px auto}
+  .dial{width:140px;height:140px;border-radius:50%;border:3px solid #475569;position:relative;background:radial-gradient(circle,var(--bg3),var(--bg))}
+  .dial i{position:absolute;font-style:normal;font-size:12px;font-weight:700;color:var(--mut)}
+  .dial .n{top:4px;left:50%;transform:translateX(-50%);color:var(--bad)}
+  .dial .e{top:50%;right:6px;transform:translateY(-50%)}
+  .dial .s{bottom:4px;left:50%;transform:translateX(-50%)}
+  .dial .w{top:50%;left:6px;transform:translateY(-50%)}
+  .arrow{position:absolute;left:50%;bottom:50%;width:4px;height:55px;margin-left:-2px;transform-origin:bottom center;background:linear-gradient(to top,#0ea5e9,var(--pri));border-radius:4px 4px 0 0}
+  .dial::after{content:"";position:absolute;top:50%;left:50%;width:8px;height:8px;margin:-4px 0 0 -4px;background:#facc15;border-radius:50%}
+
+  /* Calibration wizard */
+  .calib{position:fixed;top:0;right:0;width:420px;max-width:100vw;height:100%;background:var(--bg3);border-left:3px solid var(--warn);z-index:9000;padding:14px;overflow-y:auto;box-shadow:-6px 0 20px rgba(0,0,0,.6)}
+  .calib-title{font-size:15px;font-weight:700;color:#facc15;margin-bottom:10px}
+  .calib-box{position:relative;width:100%;height:320px;overflow:auto;border:2px solid var(--pri);background:#000;margin:8px 0;cursor:crosshair}
+  .calib-box img{display:block;max-width:none}
+  .cross-h,.cross-v{position:absolute;pointer-events:none;display:none;z-index:5}
+  .cross-h{left:0;height:0;border-top:2px dashed var(--warn)}
+  .cross-v{top:0;width:0;border-left:2px dashed var(--warn)}
+  .calib-pt{position:absolute;width:18px;height:18px;margin:-9px 0 0 -9px;border-radius:50%;background:var(--ok);border:2px solid #fff;z-index:6;font-size:10px;font-weight:700;color:#000;text-align:center;line-height:14px;pointer-events:none}
+  .calib-nav{display:flex;gap:8px;margin-top:12px}
+  .calib-nav button{flex:1}
+
+  @media (max-width:800px){
+    body{flex-direction:column}
+    #map{flex:0 0 50%;height:auto}
+    #panel{width:100%;flex:1;min-height:0}
+    .calib{width:100%}
+  }
+</style>
+</head>
+<body>
+
+<div id="banner" class="banner" role="alert" hidden></div>
+<div id="modal" class="modal" role="dialog" aria-modal="true" hidden>
+  <div class="modal-card">
+    <p id="modalMsg"></p>
+    <div class="row"><button id="modalNo" class="secondary">ยกเลิก</button><button id="modalYes">ตกลง</button></div>
+  </div>
+</div>
+<div id="calibWiz" class="calib" hidden></div>
+
+<div id="map"></div>
+
+<aside id="panel">
+  <h2>🚁 Drone Mission Planner</h2>
+  <div id="status" role="status" aria-live="polite">คลิกบนแผนที่เพื่อเพิ่มจุด waypoint</div>
+
+  <div class="toolbar">
+    <button class="gps" data-act="locate">📍 ตำแหน่งปัจจุบัน</button>
+    <button class="track" id="trackBtn" data-act="toggleTrack">🔴 ติดตาม Real-time</button>
+    <button class="track" id="recordBtn" data-act="toggleRecord">⏺ บันทึก Track Log</button>
+    <button class="secondary" data-act="compass">🧭 เข็มทิศอุปกรณ์</button>
+    <button class="secondary" id="addBtn" data-act="toggleAdd">✏️ โหมดเพิ่มจุด: เปิด</button>
+    <button data-act="pickKml">📂 นำเข้า KML</button>
+    <button data-act="exportLitchi">⬇️ Litchi CSV</button>
+    <button data-act="exportKml">⬇️ KML</button>
+    <button data-act="saveProject">💾 บันทึกโปรเจกต์</button>
+    <button data-act="pickProject">📂 เปิดโปรเจกต์</button>
+    <button class="danger" data-act="clearAll">🗑️ ล้างจุดทั้งหมด</button>
+  </div>
+  <input type="file" id="kmlInput" accept=".kml,application/vnd.google-earth.kml+xml" hidden>
+  <input type="file" id="projectInput" accept=".json,application/json" hidden>
+
+  <div class="box grid">
+    <label>ความสูงเริ่มต้นของจุดใหม่ (ม.)<input id="defAlt" type="number" value="50" min="1"></label>
+    <label>ความเร็วบิน Litchi (ม./วิ)<input id="defSpeed" type="number" value="5" min="0.1" step="0.1"></label>
+  </div>
+
+  <details>
+    <summary>🗺️ Overlay ภาพถ่าย/โฉนด/ผังออกแบบ</summary>
+    <button class="block" data-act="pickOverlay">📂 อัปโหลดภาพ Overlay</button>
+    <input type="file" id="overlayInput" accept="image/*" hidden>
+    <div class="wp-actions">
+      <button data-act="exportCalib">⬇️ Export Calibration</button>
+      <button data-act="pickCalib">📂 Import Calibration</button>
+    </div>
+    <input type="file" id="calibInput" accept=".json,application/json" hidden>
+
+    <div id="ovControls" hidden>
+      <button class="block" data-act="calibStart" style="margin:8px 0 6px">🎯 คาลิเบรทสเกลใหม่</button>
+      <button class="secondary block" id="adjustBtn" data-act="toggleAdjust">🖐️ โหมดลากวางภาพ: ปิด</button>
+      <div class="row" style="margin-top:8px"><label for="ovOpacity">โปร่งใส:</label>
+        <input type="range" id="ovOpacity" min="0" max="100" value="70"><span id="ovOpacityLabel" class="hint">70%</span></div>
+      <div class="row" style="margin-top:6px"><label for="ovRot">หมุน (°):</label>
+        <button class="secondary" data-act="rot" data-d="-1">↺ -1°</button>
+        <input type="number" id="ovRot" value="0" step="0.1" style="width:70px">
+        <button class="secondary" data-act="rot" data-d="1">↻ +1°</button></div>
+      <div class="row" style="margin-top:6px"><label>สเกล:</label>
+        <button class="secondary" data-act="scale" data-d="-0.05">−5%</button>
+        <button class="secondary" data-act="scale" data-d="-0.01">−1%</button>
+        <span id="ovScaleLabel" class="hint">100%</span>
+        <button class="secondary" data-act="scale" data-d="0.01">+1%</button>
+        <button class="secondary" data-act="scale" data-d="0.05">+5%</button></div>
+      <div class="row" style="margin-top:6px"><label>ขยับ:</label>
+        <button class="secondary" data-act="nudge" data-dx="0" data-dy="-3" aria-label="ขึ้น">⬆️</button>
+        <button class="secondary" data-act="nudge" data-dx="-3" data-dy="0" aria-label="ซ้าย">⬅️</button>
+        <button class="secondary" data-act="nudge" data-dx="3" data-dy="0" aria-label="ขวา">➡️</button>
+        <button class="secondary" data-act="nudge" data-dx="0" data-dy="3" aria-label="ลง">⬇️</button></div>
+      <button class="danger block" data-act="removeOverlay" style="margin-top:8px">🗑️ ลบ Overlay</button>
+    </div>
+  </details>
+
+  <details>
+    <summary>📐 วัดพื้นที่ (ตร.ม. / ไร่-งาน-ตร.วา)</summary>
+    <div class="wp-actions">
+      <button class="secondary" id="measureBtn" data-act="measureToggle">📐 เริ่มวัด</button>
+      <button class="secondary" data-act="measureUndo">↩️ ย้อนจุด</button>
+      <button class="danger" data-act="measureClear">🗑️ ล้าง</button>
+    </div>
+    <div id="measureBox" hidden style="margin-top:8px">
+      <div class="nav-row"><span>จำนวนจุด:</span><b id="mCount">0</b></div>
+      <div class="nav-row"><span>เส้นรอบรูป:</span><b id="mPerim">-</b></div>
+      <div class="nav-row"><span>พื้นที่:</span><b id="mArea">-</b></div>
+      <div class="nav-row"><span>ไร่-งาน-ตร.วา:</span><b id="mRai">-</b></div>
+    </div>
+  </details>
+
+  <details>
+    <summary>🔔 แจ้งเตือนเมื่อเข้าใกล้จุด</summary>
+    <button class="secondary block" id="alertBtn" data-act="alertToggle">🔕 เปิดการแจ้งเตือน</button>
+    <div class="row" style="margin-top:8px"><label for="alertRadius">รัศมี (เมตร):</label>
+      <input type="number" id="alertRadius" value="20" min="1" style="width:80px"></div>
+  </details>
+
+  <div class="info" id="curPosBox" hidden>
+    <div class="title"><span>📡 ตำแหน่งปัจจุบัน</span></div>
+    <div class="nav-row"><span>Lat/Lng:</span><b id="curLatLng">-</b></div>
+    <div class="nav-row"><span>UTM:</span><b id="curUTM">-</b></div>
+  </div>
+
+  <div class="info" id="trackBox" hidden>
+    <div class="title"><span>📼 Track Log</span><span id="trackState"></span></div>
+    <div class="nav-row"><span>จำนวนจุด:</span><b id="trackCount">0</b></div>
+    <div class="nav-row"><span>ระยะทางจริง:</span><b id="trackDist">0 ม.</b></div>
+    <div class="nav-row"><span>ระยะเวลา:</span><b id="trackTime">00:00</b></div>
+    <div class="wp-actions">
+      <button data-act="trackKml">⬇️ KML</button>
+      <button data-act="trackCsv">⬇️ CSV</button>
+      <button class="danger" data-act="trackClear">🗑️ ล้าง</button>
+    </div>
+  </div>
+
+  <div class="box" id="navBox" hidden style="border-color:var(--pri)">
+    <div class="row" style="justify-content:space-between;margin-bottom:8px">
+      <h3>🎯 นำทางไป <span id="navTarget">-</span></h3>
+      <button class="secondary" data-act="navCancel">✖ ยกเลิก</button>
+    </div>
+    <div class="nav-row"><span>ระยะทาง:</span><b id="navDist">-</b></div>
+    <div class="nav-row"><span>ทิศทาง (Bearing):</span><b id="navBear">-</b></div>
+    <div class="compass-wrap">
+      <div class="dial" id="dial"><i class="n">N</i><i class="e">E</i><i class="s">S</i><i class="w">W</i><div class="arrow" id="arrow"></div></div>
+    </div>
+    <div id="navTurn" class="hint" style="text-align:center;color:#86efac" hidden></div>
+  </div>
+
+  <div id="wpList"></div>
+</aside>
+
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"
+        integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin=""></script>
+<script>
+(() => {
+'use strict';
+document.addEventListener('DOMContentLoaded', () => {
+  const $ = id => document.getElementById(id);
+  if (typeof L === 'undefined') {
+    $('status').textContent = '⚠️ โหลดไลบรารีแผนที่ (Leaflet) ไม่สำเร็จ กรุณาตรวจสอบอินเทอร์เน็ต';
+    return;
+  }
+
+  /* ================= Utilities ================= */
+  const ACTIONS = { none: 'ไม่มี action', photo: 'ถ่ายภาพ (Take Photo)', release: 'ปล่อยของ/ชี้เป้า (บันทึกใน KML เท่านั้น)' };
+  const MERC = 156543.03392;      // เมตร/พิกเซล ที่ zoom 0 (tile 256px, เส้นศูนย์สูตร)
+  const CALIB_ZOOM = 18;          // zoom อ้างอิงของสเกลภาพ Overlay
+  const MAX_IMPORT = 500;
+  const PROJECT_TYPE = 'drone_mission_project';
+
+  const rad = d => d * Math.PI / 180;
+  const num = (v, d = 0) => Number.isFinite(parseFloat(v)) ? parseFloat(v) : d;
+  const fmtDist = m => m >= 1000 ? (m / 1000).toFixed(2) + ' กม.' : m.toFixed(1) + ' ม.';
+  const validLL = (lat, lng) => Number.isFinite(lat) && Number.isFinite(lng) && Math.abs(lat) <= 90 && Math.abs(lng) <= 180;
+
+  function haversine(lat1, lon1, lat2, lon2) {
+    const dφ = rad(lat2 - lat1), dλ = rad(lon2 - lon1);
+    const a = Math.sin(dφ / 2) ** 2 + Math.cos(rad(lat1)) * Math.cos(rad(lat2)) * Math.sin(dλ / 2) ** 2;
+    return 6371000 * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+  }
+  function bearing(lat1, lon1, lat2, lon2) {
+    const dλ = rad(lon2 - lon1);
+    const y = Math.sin(dλ) * Math.cos(rad(lat2));
+    const x = Math.cos(rad(lat1)) * Math.sin(rad(lat2)) - Math.sin(rad(lat1)) * Math.cos(rad(lat2)) * Math.cos(dλ);
+    return (Math.atan2(y, x) * 180 / Math.PI + 360) % 360;
+  }
+  const COMPASS = ['N','NNE','NE','ENE','E','ESE','SE','SSE','S','SSW','SW','WSW','W','WNW','NW','NNW'];
+  const compassLabel = b => COMPASS[Math.round(b / 22.5) % 16];
+
+  /** WGS84 → UTM (สูตร Snyder) โซนคำนวณอัตโนมัติ หรือบังคับโซนเพื่อให้หลายจุดอยู่ระบบเดียวกัน */
+  function toUTM(lat, lon, forcedZone) {
+    const a = 6378137, f = 1 / 298.257223563, k0 = 0.9996;
+    const e2 = f * (2 - f), e4 = e2 * e2, e6 = e4 * e2, ep2 = e2 / (1 - e2);
+    const zone = forcedZone ?? Math.min(60, Math.floor((lon + 180) / 6) + 1);
+    const φ = rad(lat), λ0 = rad((zone - 1) * 6 - 180 + 3);
+    const N = a / Math.sqrt(1 - e2 * Math.sin(φ) ** 2);
+    const T = Math.tan(φ) ** 2, C = ep2 * Math.cos(φ) ** 2, A = Math.cos(φ) * (rad(lon) - λ0);
+    const M = a * ((1 - e2 / 4 - 3 * e4 / 64 - 5 * e6 / 256) * φ
+      - (3 * e2 / 8 + 3 * e4 / 32 + 45 * e6 / 1024) * Math.sin(2 * φ)
+      + (15 * e4 / 256 + 45 * e6 / 1024) * Math.sin(4 * φ)
+      - (35 * e6 / 3072) * Math.sin(6 * φ));
+    const easting = k0 * N * (A + (1 - T + C) * A ** 3 / 6 + (5 - 18 * T + T * T + 72 * C - 58 * ep2) * A ** 5 / 120) + 500000;
+    let northing = k0 * (M + N * Math.tan(φ) * (A * A / 2 + (5 - T + 9 * C + 4 * C * C) * A ** 4 / 24
+      + (61 - 58 * T + T * T + 600 * C - 330 * ep2) * A ** 6 / 720));
+    if (lat < 0) northing += 1e7;
+    return { easting, northing, zone, hemi: lat < 0 ? 'S' : 'N' };
+  }
+  const formatUTM = (lat, lng) => {
+    const u = toUTM(lat, lng);
+    return `E ${u.easting.toFixed(2)} N ${u.northing.toFixed(2)} (${u.zone}${u.hemi})`;
+  };
+
+  /** แปลง ตร.ม. → ไร่-งาน-ตร.วา (1 ไร่=1600, 1 งาน=400, 1 ตร.วา=4 ตร.ม.) */
+  function toRaiNganWah(sqm) {
+    const totalWah = Math.round(sqm / 4 * 100) / 100;   // ปัดก่อนเพื่อกันเศษทศนิยมลอย
+    const rai = Math.floor(totalWah / 400);
+    const ngan = Math.floor((totalWah - rai * 400) / 100);
+    return { rai, ngan, wah: totalWah - rai * 400 - ngan * 100 };
+  }
+  function polygonArea(pts) {  // Shoelace
+    let s = 0;
+    for (let i = 0; i < pts.length; i++) {
+      const p = pts[i], q = pts[(i + 1) % pts.length];
+      s += p.easting * q.northing - q.easting * p.northing;
+    }
+    return Math.abs(s / 2);
+  }
+
+  /* ================= Map ================= */
+  const map = L.map('map', { maxZoom: 23, tap: true }).setView([13.736717, 100.523186], 13);
+  const sat = L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}', {
+    attribution: 'Tiles &copy; Esri &mdash; Maxar, Earthstar Geographics, USGS, and the GIS User Community',
+    maxZoom: 23, maxNativeZoom: 19
+  }).addTo(map);
+  const street = L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png', {
+    attribution: '&copy; OpenStreetMap contributors', maxZoom: 23, maxNativeZoom: 19
+  });
+  const labels = L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/Reference/World_Boundaries_and_Places/MapServer/tile/{z}/{y}/{x}', {
+    maxZoom: 23, maxNativeZoom: 19, zIndex: 5
+  }).addTo(map);
+  L.control.layers({ 'ดาวเทียม': sat, 'แผนที่ถนน': street }, { 'ป้ายชื่อสถานที่': labels }).addTo(map);
+  L.control.scale({ metric: true, imperial: false, position: 'bottomleft', maxWidth: 150 }).addTo(map);
+  if (window.ResizeObserver) new ResizeObserver(() => map.invalidateSize()).observe($('map'));
+
+  /* ================= State ================= */
+  let waypoints = [], markers = [], targetIdx = null;
+  const routeLine = L.polyline([], { color: '#38bdf8', weight: 3, dashArray: '6,6', interactive: false }).addTo(map);
+  let guideLine = null;
+  let addMode = true;
+
+  let current = null, gpsMarker = null, watchId = null, tracking = false, followOnce = false;
+  let compassOn = false, deviceHeading = null;
+
+  let track = [], trackDist = 0, recording = false, trackTimer = null;
+  const trackLine = L.polyline([], { color: '#22c55e', weight: 4, opacity: .85, interactive: false }).addTo(map);
+
+  let alertOn = false, audioCtx = null, bannerTimer = null;
+  const inside = new WeakSet();      // waypoint ที่ผู้ใช้อยู่ในรัศมีแล้ว (กันแจ้งเตือนซ้ำ)
+
+  let overlay = null, overlayEl = null, adjustMode = false, calib = null;
+  let measureMode = false, mPts = [], mMarkers = [], mShape = null;
+
+  /* ================= UI helpers ================= */
+  const setStatus = m => { $('status').textContent = m; };
+  function showBanner(msg, kind = 'warn') {
+    const b = $('banner');
+    b.textContent = msg; b.className = 'banner ' + kind; b.hidden = false;
+    clearTimeout(bannerTimer);
+    bannerTimer = setTimeout(() => { b.hidden = true; }, 4000);
+  }
+  const warn = msg => { showBanner(msg, 'warn'); setStatus(msg); };
+
+  /** กล่องยืนยันแทน confirm() (ถูกบล็อกใน sandbox) */
+  function ask(msg) {
+    return new Promise(resolve => {
+      const modal = $('modal'), yes = $('modalYes'), no = $('modalNo');
+      $('modalMsg').textContent = msg; modal.hidden = false; yes.focus();
+      const done = v => { modal.hidden = true; yes.onclick = no.onclick = modal.onkeydown = null; resolve(v); };
+      yes.onclick = () => done(true);
+      no.onclick = () => done(false);
+      modal.onkeydown = e => { if (e.key === 'Escape') done(false); };
+    });
+  }
+  function setToggle(btn, on, onText, offText, offClass) {
+    btn.textContent = on ? onText : offText;
+    btn.classList.toggle('danger', on);
+    btn.classList.toggle(offClass, !on);
+  }
+  function downloadFile(content, filename, mime) {
+    const url = URL.createObjectURL(new Blob([content], { type: mime }));
+    const a = document.createElement('a');
+    a.href = url; a.download = filename;
+    document.body.appendChild(a); a.click(); a.remove();
+    setTimeout(() => URL.revokeObjectURL(url), 1000);
+  }
+  const readDataURL = f => new Promise((res, rej) => {
+    const r = new FileReader(); r.onload = () => res(r.result); r.onerror = () => rej(r.error); r.readAsDataURL(f);
+  });
+  const loadImage = src => new Promise((res, rej) => {
+    const i = new Image(); i.onload = () => res(i); i.onerror = () => rej(new Error('ไฟล์ภาพไม่ถูกต้อง')); i.src = src;
+  });
+  function onPick(input, handler) {
+    input.addEventListener('change', async () => {
+      const f = input.files[0]; input.value = '';
+      if (!f) return;
+      try { await handler(f); } catch (err) { warn('เกิดข้อผิดพลาด: ' + err.message); }
+    });
+  }
+
+  /* ================= Waypoints ================= */
+  const makeWP = (o = {}) => ({
+    lat: o.lat, lng: o.lng,
+    altitude: num(o.altitude, 50), hold: Math.max(0, num(o.hold)), heading: num(o.heading),
+    waitForCommand: !!o.waitForCommand,
+    action: Object.hasOwn(ACTIONS, o.action) ? o.action : 'none',
+    reached: false
+  });
+  const tipText = (wp, i) => `Point ${i + 1}<br>Alt: ${wp.altitude} m<br>Hold: ${wp.hold} s`;
+
+  function setAddMode(on) {
+    addMode = on;
+    $('addBtn').textContent = '✏️ โหมดเพิ่มจุด: ' + (on ? 'เปิด' : 'ปิด');
+  }
+  function addWaypoint(lat, lng) {
+    waypoints.push(makeWP({ lat, lng, altitude: num($('defAlt').value, 50) }));
+    redraw();
+    setStatus(`เพิ่มจุดที่ ${waypoints.length} แล้ว`);
+  }
+  function updateRoute() { routeLine.setLatLngs(waypoints.map(w => [w.lat, w.lng])); }
+
+  function drawMarkers() {
+    markers.forEach(m => m.remove());
+    markers = waypoints.map((wp, i) => {
+      const icon = L.divIcon({ className: 'wp-pin' + (i === targetIdx ? ' target' : ''), html: String(i + 1), iconSize: [28, 28], iconAnchor: [14, 14] });
+      const m = L.marker([wp.lat, wp.lng], { icon, draggable: true }).addTo(map);
+      m.bindTooltip(tipText(wp, i));
+      m.on('drag', () => { const p = m.getLatLng(); wp.lat = p.lat; wp.lng = p.lng; updateRoute(); });
+      m.on('dragend', () => { inside.delete(wp); renderList(); updateNav(); });
+      return m;
+    });
+  }
+  function redraw() { drawMarkers(); updateRoute(); renderList(); updateNav(); }
+
+  function renderList() {
+    const list = $('wpList');
+    if (!waypoints.length) { list.innerHTML = '<div class="empty">ยังไม่มีจุด waypoint<br>คลิกบนแผนที่เพื่อเริ่ม</div>'; return; }
+    list.innerHTML = waypoints.map((wp, i) => `
+      <div class="wp-item ${i === targetIdx ? 'selected' : ''}" data-idx="${i}">
+        <div class="wp-title">
+          <span>📍 จุดที่ ${i + 1}${wp.reached ? '<span class="badge">✅ ถึงแล้ว</span>' : ''}</span>
+          <span class="hint" style="margin:0">${wp.lat.toFixed(5)}, ${wp.lng.toFixed(5)}</span>
+        </div>
+        <div class="wp-utm">📐 UTM: ${formatUTM(wp.lat, wp.lng)}</div>
+        <label class="wp-row"><span>ความสูง (m)</span><input type="number" data-field="altitude" value="${wp.altitude}"></label>
+        <label class="wp-row"><span>หน่วงเวลา (วิ)</span><input type="number" data-field="hold" min="0" value="${wp.hold}"></label>
+        <label class="wp-row"><span>ทิศทาง (°)</span><input type="number" data-field="heading" value="${wp.heading}"></label>
+        <label class="wp-row"><span>รอคำสั่ง (หยุดนาน)</span><input type="checkbox" data-field="waitForCommand" ${wp.waitForCommand ? 'checked' : ''}></label>
+        <label class="wp-row"><span>Action</span><select data-field="action">
+          ${Object.entries(ACTIONS).map(([k, v]) => `<option value="${k}" ${wp.action === k ? 'selected' : ''}>${v}</option>`).join('')}
+        </select></label>
+        <div class="wp-actions">
+          <button class="goto" data-act="wpGoto">${i === targetIdx ? '🎯 กำลังนำทาง' : '🎯 Goto'}</button>
+          <button class="secondary" data-act="wpUp" aria-label="เลื่อนขึ้น">⬆️</button>
+          <button class="secondary" data-act="wpDown" aria-label="เลื่อนลง">⬇️</button>
+          <button class="danger" data-act="wpDel">🗑️ ลบ</button>
+        </div>
+      </div>`).join('');
+  }
+
+  // แก้ค่าในรายการโดยไม่ re-render ทั้งลิสต์ (รักษาโฟกัสของ input)
+  $('wpList').addEventListener('change', e => {
+    const el = e.target.closest('[data-field]');
+    if (!el) return;
+    const i = +el.closest('.wp-item').dataset.idx, wp = waypoints[i], f = el.dataset.field;
+    if (!wp) return;
+    if (f === 'waitForCommand') wp.waitForCommand = el.checked;
+    else if (f === 'action') { if (Object.hasOwn(ACTIONS, el.value)) wp.action = el.value; }
+    else if (['altitude', 'hold', 'heading'].includes(f)) wp[f] = f === 'hold' ? Math.max(0, num(el.value)) : num(el.value);
+    markers[i]?.setTooltipContent(tipText(wp, i));
+  });
+
+  const wpIndex = b => +b.closest('.wp-item').dataset.idx;
+  function moveWP(i, dir) {
+    const j = i + dir;
+    if (j < 0 || j >= waypoints.length) return;
+    [waypoints[i], waypoints[j]] = [waypoints[j], waypoints[i]];
+    if (targetIdx === i) targetIdx = j; else if (targetIdx === j) targetIdx = i;
+    redraw();
+  }
+  function removeWP(i) {
+    waypoints.splice(i, 1);
+    if (targetIdx === i) targetIdx = null; else if (targetIdx !== null && targetIdx > i) targetIdx--;
+    redraw();
+    setStatus(`ลบจุดแล้ว เหลือ ${waypoints.length} จุด`);
+  }
+  function gotoWP(i) {
+    if (targetIdx === i) targetIdx = null;
+    else if (!current) { warn('กรุณากด "ตำแหน่งปัจจุบัน" หรือเริ่มติดตามตำแหน่งก่อน'); return; }
+    else targetIdx = i;
+    redraw();
+  }
+
+  /* ================= GPS & Tracking ================= */
+  function onPosition(pos) {
+    const { latitude: lat, longitude: lng, altitude, speed } = pos.coords;
+    current = { lat, lng };
+    if (!gpsMarker) gpsMarker = L.marker([lat, lng], { icon: L.divIcon({ className: 'gps-dot', html: '', iconSize: [18, 18], iconAnchor: [9, 9] }), interactive: false }).addTo(map);
+    else gpsMarker.setLatLng([lat, lng]);
+    if (followOnce) { followOnce = false; map.setView([lat, lng], Math.max(map.getZoom(), 17)); }
+
+    $('curPosBox').hidden = false;
+    $('curLatLng').textContent = `${lat.toFixed(6)}, ${lng.toFixed(6)}`;
+    $('curUTM').textContent = formatUTM(lat, lng);
+
+    if (recording) {
+      const last = track[track.length - 1];
+      const d = last ? haversine(last.lat, last.lng, lat, lng) : 0;
+      if (!last || d >= 1) {            // กรองสัญญาณสั่นเมื่อหยุดนิ่ง (<1 ม.)
+        track.push({ lat, lng, t: Date.now(), alt: altitude, spd: speed });
+        trackDist += d;
+        trackLine.addLatLng([lat, lng]);
+        renderTrackInfo();
+      }
+    }
+    if (alertOn) checkProximity();
+    updateNav();
+  }
+  function onPosError(err) {
+    const msgs = { 1: 'กรุณาอนุญาตให้เข้าถึงตำแหน่ง (หรือสภาพแวดล้อมนี้ไม่อนุญาต GPS)', 2: 'ไม่สามารถระบุตำแหน่งได้ในขณะนี้', 3: 'หมดเวลาค้นหาตำแหน่ง' };
+    warn(msgs[err.code] || 'ไม่สามารถหาตำแหน่งได้');
+  }
+  function locateMe() {
+    if (!navigator.geolocation) { warn('เบราว์เซอร์นี้ไม่รองรับ GPS'); return; }
+    setStatus('กำลังค้นหาตำแหน่งของคุณ...');
+    followOnce = true;
+    navigator.geolocation.getCurrentPosition(onPosition, onPosError, { enableHighAccuracy: true, timeout: 10000, maximumAge: 0 });
+  }
+  function startTracking() {
+    if (!navigator.geolocation) { warn('เบราว์เซอร์นี้ไม่รองรับ GPS'); return false; }
+    watchId = navigator.geolocation.watchPosition(onPosition, onPosError, { enableHighAccuracy: true, maximumAge: 0, timeout: 15000 });
+    tracking = true; followOnce = true;
+    setToggle($('trackBtn'), true, '⏹ หยุดติดตามตำแหน่ง', '🔴 ติดตาม Real-time', 'track');
+    setStatus('เริ่มติดตามตำแหน่งแบบ Real-time แล้ว');
+    return true;
+  }
+  function stopTracking() {
+    if (watchId !== null) navigator.geolocation.clearWatch(watchId);
+    watchId = null; tracking = false;
+    if (recording) stopRecord();
+    setToggle($('trackBtn'), false, '⏹ หยุดติดตามตำแหน่ง', '🔴 ติดตาม Real-time', 'track');
+    setStatus('หยุดติดตามตำแหน่งแล้ว');
+  }
+
+  /* ================= Track log ================= */
+  async function toggleRecord() {
+    if (recording) { stopRecord(); return; }
+    if (track.length && !(await ask('การเริ่มบันทึกใหม่จะลบ Track Log เดิม ต้องการดำเนินการต่อหรือไม่?'))) return;
+    if (!tracking && !startTracking()) return;
+    track = []; trackDist = 0; trackLine.setLatLngs([]);
+    recording = true;
+    trackTimer = setInterval(renderTrackInfo, 1000);
+    setToggle($('recordBtn'), true, '⏹ หยุดบันทึก Track Log', '⏺ บันทึก Track Log', 'track');
+    setStatus('เริ่มบันทึก Track Log แล้ว');
+    renderTrackInfo();
+  }
+  function stopRecord() {
+    recording = false; clearInterval(trackTimer);
+    setToggle($('recordBtn'), false, '⏹ หยุดบันทึก Track Log', '⏺ บันทึก Track Log', 'track');
+    setStatus(`หยุดบันทึก Track Log แล้ว (${track.length} จุด)`);
+    renderTrackInfo();
+  }
+  function renderTrackInfo() {
+    $('trackBox').hidden = !track.length && !recording;
+    $('trackState').textContent = recording ? '🔴 กำลังบันทึก' : '⏸ หยุดแล้ว';
+    $('trackCount').textContent = track.length;
+    $('trackDist').textContent = fmtDist(trackDist);
+    const end = recording ? Date.now() : (track.length ? track[track.length - 1].t : 0);
+    const sec = track.length ? Math.max(0, Math.floor((end - track[0].t) / 1000)) : 0;
+    $('trackTime').textContent = String(Math.floor(sec / 60)).padStart(2, '0') + ':' + String(sec % 60).padStart(2, '0');
+  }
+  function setTrack(points) {
+    track = points; trackDist = 0;
+    for (let i = 1; i < track.length; i++) trackDist += haversine(track[i - 1].lat, track[i - 1].lng, track[i].lat, track[i].lng);
+    trackLine.setLatLngs(track.map(p => [p.lat, p.lng]));
+    renderTrackInfo();
+  }
+  function exportTrackKML() {
+    if (!track.length) { warn('ยังไม่มีข้อมูล Track Log'); return; }
+    const hasAlt = track.some(p => p.alt != null);
+    const coords = track.map(p => `${p.lng},${p.lat},${p.alt ?? 0}`).join(' ');
+    downloadFile(`<?xml version="1.0" encoding="UTF-8"?>
+<kml xmlns="http://www.opengis.net/kml/2.2"><Document><name>Actual Flight Track Log</name>
+<Placemark><name>Recorded Track</name><LineString><altitudeMode>${hasAlt ? 'absolute' : 'clampToGround'}</altitudeMode><coordinates>${coords}</coordinates></LineString></Placemark>
+</Document></kml>`, 'track_log.kml', 'application/vnd.google-earth.kml+xml');
+    setStatus('Export Track Log (KML) สำเร็จ');
+  }
+  function exportTrackCSV() {
+    if (!track.length) { warn('ยังไม่มีข้อมูล Track Log'); return; }
+    const rows = ['timestamp,lat,lng,utm_zone,utm_easting,utm_northing,altitude(m),speed(m/s)'];
+    track.forEach(p => {
+      const u = toUTM(p.lat, p.lng);
+      rows.push([new Date(p.t).toISOString(), p.lat.toFixed(7), p.lng.toFixed(7), u.zone + u.hemi, u.easting.toFixed(2), u.northing.toFixed(2), p.alt ?? '', p.spd ?? ''].join(','));
+    });
+    downloadFile(rows.join('\n'), 'track_log.csv', 'text/csv');
+    setStatus('Export Track Log (CSV) สำเร็จ');
+  }
+
+  /* ================= Proximity alert ================= */
+  function beep() {
+    if (!audioCtx) return;
+    try {
+      const osc = audioCtx.createOscillator(), gain = audioCtx.createGain();
+      osc.connect(gain); gain.connect(audioCtx.destination);
+      osc.frequency.value = 880;
+      gain.gain.setValueAtTime(0.4, audioCtx.currentTime);
+      gain.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + 0.5);
+      osc.start(); osc.stop(audioCtx.currentTime + 0.5);
+    } catch (e) { /* เสียงไม่รองรับ ข้ามได้ */ }
+  }
+  function toggleAlert() {
+    alertOn = !alertOn;
+    if (alertOn) {
+      if (!audioCtx) { try { audioCtx = new (window.AudioContext || window.webkitAudioContext)(); } catch (e) { /* ไม่มีเสียง */ } }
+      waypoints.forEach(w => { w.reached = false; inside.delete(w); });
+      renderList();
+    }
+    setToggle($('alertBtn'), alertOn, '🔔 ปิดการแจ้งเตือน', '🔕 เปิดการแจ้งเตือน', 'secondary');
+    setStatus(alertOn ? `เปิดระบบแจ้งเตือนแล้ว (รัศมี ${num($('alertRadius').value, 20)} ม.)` : 'ปิดระบบแจ้งเตือนแล้ว');
+  }
+  function checkProximity() {
+    if (!current) return;
+    const r = Math.max(1, num($('alertRadius').value, 20));
+    waypoints.forEach((wp, i) => {
+      const d = haversine(current.lat, current.lng, wp.lat, wp.lng);
+      if (d <= r && !inside.has(wp)) {
+        inside.add(wp); wp.reached = true;
+        showBanner(`🔔 เข้าใกล้จุดที่ ${i + 1} แล้ว! (${d.toFixed(1)} ม.)`, 'alert');
+        beep();
+        try { navigator.vibrate?.(300); } catch (e) { /* ไม่รองรับ */ }
+        renderList();
+      } else if (d > r * 1.3) inside.delete(wp);   // hysteresis กันแจ้งซ้ำตอนสัญญาณแกว่ง
+    });
+  }
+
+  /* ================= Device compass & navigation ================= */
+  function onOrient(e) {
+    if (e.webkitCompassHeading != null) deviceHeading = e.webkitCompassHeading;   // iOS
+    else if (e.alpha != null) deviceHeading = (360 - e.alpha) % 360;              // Android (absolute ถ้ามี)
+    else return;
+    updateNav();
+  }
+  async function enableCompass() {
+    if (compassOn) return;
+    try {
+      if (typeof DeviceOrientationEvent !== 'undefined' && typeof DeviceOrientationEvent.requestPermission === 'function') {
+        if (await DeviceOrientationEvent.requestPermission() !== 'granted') { warn('ไม่ได้รับอนุญาตให้ใช้เซ็นเซอร์เข็มทิศ'); return; }
+        window.addEventListener('deviceorientation', onOrient, true);
+      } else if ('ondeviceorientationabsolute' in window) window.addEventListener('deviceorientationabsolute', onOrient, true);
+      else if ('ondeviceorientation' in window) window.addEventListener('deviceorientation', onOrient, true);
+      else { warn('อุปกรณ์นี้ไม่รองรับเข็มทิศ (ต้องใช้ HTTPS บนมือถือ)'); return; }
+      compassOn = true; setStatus('เปิดใช้งานเข็มทิศอุปกรณ์แล้ว');
+    } catch (err) { warn('เปิดเข็มทิศไม่สำเร็จ: ' + err.message); }
+  }
+  function updateNav() {
+    if (guideLine) { guideLine.remove(); guideLine = null; }
+    const wp = waypoints[targetIdx];
+    if (targetIdx === null || !current || !wp) { $('navBox').hidden = true; return; }
+    $('navBox').hidden = false;
+    const dist = haversine(current.lat, current.lng, wp.lat, wp.lng);
+    const brg = bearing(current.lat, current.lng, wp.lat, wp.lng);
+    $('navTarget').textContent = `จุดที่ ${targetIdx + 1}`;
+    $('navDist').textContent = fmtDist(dist);
+    $('navBear').textContent = `${brg.toFixed(1)}° (${compassLabel(brg)})`;
+    // ถ้ารู้ทิศอุปกรณ์ หมุนหน้าปัดให้ N ชี้เหนือจริง ลูกศรจึงชี้ไปทางเป้าหมายตามที่ตามองเห็น
+    $('dial').style.transform = deviceHeading !== null ? `rotate(${-deviceHeading}deg)` : '';
+    $('arrow').style.transform = `rotate(${brg}deg)`;
+    const turn = $('navTurn');
+    if (deviceHeading !== null) {
+      const rel = (brg - deviceHeading + 360) % 360;
+      const deg = rel > 180 ? 360 - rel : rel;
+      turn.textContent = deg < 8 ? '✅ หันหน้าตรงเป้าหมายแล้ว' : `หมุนตัวไปทาง${rel > 180 ? 'ซ้าย' : 'ขวา'} ${deg.toFixed(0)}°`;
+      turn.hidden = false;
+    } else turn.hidden = true;
+    guideLine = L.polyline([[current.lat, current.lng], [wp.lat, wp.lng]], { color: '#facc15', weight: 2, dashArray: '4,8', interactive: false }).addTo(map);
+  }
+
+  /* ================= Overlay image ================= */
+  function positionOverlay() {
+    if (!overlay || !overlayEl) return;
+    // สเกล (px หน้าจอ ต่อ px ภาพ) เปลี่ยนตาม zoom แบบ 2^Δzoom; จุดยึด = กึ่งกลางภาพ
+    const s = overlay.baseScale * overlay.mult * 2 ** (map.getZoom() - overlay.calibZoom);
+    const w = overlay.w * s, h = overlay.h * s;
+    const p = map.latLngToLayerPoint([overlay.lat, overlay.lng]);
+    Object.assign(overlayEl.style, {
+      width: w + 'px', height: h + 'px', left: (p.x - w / 2) + 'px', top: (p.y - h / 2) + 'px',
+      transformOrigin: '50% 50%', transform: `rotate(${overlay.rot}rad)`
+    });
+  }
+  function removeOverlayEl() {
+    if (!overlayEl) return;
+    map.off('move zoom viewreset zoomend resize', positionOverlay);
+    overlayEl.remove(); overlayEl = null;
+  }
+  function renderOverlay() {
+    if (!overlay) return;
+    if (!overlayEl) {
+      overlayEl = document.createElement('img');
+      overlayEl.className = 'overlay-img'; overlayEl.alt = ''; overlayEl.draggable = false;
+      overlayEl.src = overlay.dataUrl;
+      overlayEl.addEventListener('pointerdown', startOverlayDrag);
+      map.getPanes().overlayPane.appendChild(overlayEl);
+      map.on('move zoom viewreset zoomend resize', positionOverlay);
+    }
+    overlayEl.style.opacity = overlay.opacity;
+    overlayEl.style.pointerEvents = adjustMode ? 'auto' : 'none';
+    overlayEl.style.cursor = adjustMode ? 'move' : '';
+    positionOverlay();
+  }
+  function syncOverlayUI() {
+    $('ovControls').hidden = !overlay;
+    if (!overlay) return;
+    const pct = Math.round(overlay.opacity * 100);
+    $('ovOpacity').value = pct; $('ovOpacityLabel').textContent = pct + '%';
+    $('ovRot').value = (overlay.rot * 180 / Math.PI).toFixed(1);
+    $('ovScaleLabel').textContent = Math.round(overlay.mult * 100) + '%';
+  }
+  function setOverlay(o) { removeOverlayEl(); overlay = o; renderOverlay(); syncOverlayUI(); }
+
+  function setAdjust(on) {
+    if (on && !overlay) { warn('กรุณาคาลิเบรทภาพก่อน'); return; }
+    adjustMode = on;
+    if (on) map.dragging.disable(); else map.dragging.enable();
+    if (overlayEl) { overlayEl.style.pointerEvents = on ? 'auto' : 'none'; overlayEl.style.cursor = on ? 'move' : ''; }
+    setToggle($('adjustBtn'), on, '🖐️ โหมดลากวางภาพ: เปิด (กดเพื่อปิด)', '🖐️ โหมดลากวางภาพ: ปิด', 'secondary');
+    setStatus(on ? 'ลากที่ตัวภาพบนแผนที่เพื่อย้ายตำแหน่ง กดปุ่มอีกครั้งเพื่อกลับไปเลื่อนแผนที่' : 'ปิดโหมดลากวางภาพแล้ว');
+  }
+  function startOverlayDrag(e) {
+    if (!adjustMode || !overlay) return;
+    e.preventDefault(); e.stopPropagation();
+    overlayEl.setPointerCapture(e.pointerId);
+    const start = map.latLngToLayerPoint([overlay.lat, overlay.lng]), sx = e.clientX, sy = e.clientY;
+    const move = ev => {
+      const ll = map.layerPointToLatLng(L.point(start.x + ev.clientX - sx, start.y + ev.clientY - sy));
+      overlay.lat = ll.lat; overlay.lng = ll.lng; positionOverlay();
+    };
+    const end = () => {
+      overlayEl.removeEventListener('pointermove', move);
+      overlayEl.removeEventListener('pointerup', end);
+      overlayEl.removeEventListener('pointercancel', end);
+    };
+    overlayEl.addEventListener('pointermove', move);
+    overlayEl.addEventListener('pointerup', end);
+    overlayEl.addEventListener('pointercancel', end);
+  }
+  function validOverlay(o) {
+    return o && typeof o.dataUrl === 'string' && /^data:image\//.test(o.dataUrl) &&
+      ['w', 'h', 'lat', 'lng', 'baseScale', 'mult', 'calibZoom', 'rot', 'opacity'].every(k => Number.isFinite(o[k])) &&
+      o.w > 0 && o.h > 0 && o.baseScale > 0 && o.mult > 0 && validLL(o.lat, o.lng);
+  }
+  const cleanOverlay = o => ({
+    dataUrl: o.dataUrl, w: o.w, h: o.h, lat: o.lat, lng: o.lng, baseScale: o.baseScale,
+    mult: o.mult, calibZoom: o.calibZoom, rot: o.rot, opacity: Math.min(1, Math.max(0, o.opacity))
+  });
+
+  async function uploadOverlay(file) {
+    if (!file.type.startsWith('image/')) { warn('กรุณาเลือกไฟล์ภาพ'); return; }
+    const dataUrl = await readDataURL(file);
+    const img = await loadImage(dataUrl);
+    setStatus('อัปโหลดภาพสำเร็จ เริ่มขั้นตอนคาลิเบรท...');
+    startCalib({ dataUrl, w: img.naturalWidth, h: img.naturalHeight });
+  }
+
+  /* ---- Calibration wizard (คลิก 2 จุดบนภาพ + ระบุระยะจริง) ---- */
+  function startCalib(img) { calib = { img, step: 1, pts: [], zoom: 1 }; renderCalib(); }
+  function renderCalib() {
+    const wiz = $('calibWiz');
+    if (!calib) { wiz.hidden = true; wiz.innerHTML = ''; return; }
+    const old = $('calibBox'), sl = old ? old.scrollLeft : 0, st = old ? old.scrollTop : 0;
+    const titles = {
+      1: 'ขั้นตอน 1/3: คลิกจุดอ้างอิง A บนภาพ',
+      2: 'ขั้นตอน 2/3: คลิกจุดอ้างอิง B (ควรห่างจาก A มากที่สุด)',
+      3: 'ขั้นตอน 3/3: ระบุระยะทางจริงระหว่าง A และ B'
+    };
+    const { step } = calib;
+    let h = `<div class="calib-title">🎯 ${titles[step]}</div>`;
+    if (step < 3) {
+      h += `<div class="row"><button class="secondary" data-act="calibZoom" data-d="-0.25">🔍 ซูมออก</button>
+        <button class="secondary" data-act="calibZoom" data-d="0.25">🔍 ซูมเข้า</button></div>
+        <div class="calib-box" id="calibBox"><img id="calibImg" alt="ภาพสำหรับคาลิเบรท">
+          <div class="cross-h" id="crossH"></div><div class="cross-v" id="crossV"></div></div>
+        <p class="hint">💡 เลือกจุดที่ชัดเจนและรู้ระยะจริง เช่น หมุดเขตหรือมุมที่ดิน แล้วคลิกให้แม่นยำ (ซูมช่วยได้)</p>`;
+    } else {
+      const [a, b] = calib.pts;
+      h += `<div class="box"><p class="hint" style="margin:0 0 8px">ระยะบนภาพ ${Math.hypot(b.x - a.x, b.y - a.y).toFixed(1)} พิกเซล
+        กรอกระยะจริงของ A–B (เมตร) เช่น ระยะระหว่างหมุดเขตตามโฉนด</p>
+        <input type="number" id="calibDist" placeholder="ระยะทางจริง (เมตร)" min="0.01" step="0.01" style="width:100%;margin-bottom:8px">
+        <button class="block" data-act="calibOk">✅ คำนวณสเกลและวางภาพลงแผนที่</button></div>`;
+    }
+    h += `<div class="calib-nav">${step > 1 ? '<button class="secondary" data-act="calibBack">⬅️ ย้อนกลับ</button>' : ''}<button class="danger" data-act="calibCancel">✖ ยกเลิก</button></div>`;
+    wiz.innerHTML = h; wiz.hidden = false;
+    if (step < 3) setupCalibImage(sl, st);
+  }
+  function setupCalibImage(sl, st) {
+    const box = $('calibBox'), im = $('calibImg'), ch = $('crossH'), cv = $('crossV');
+    const { img, zoom, pts } = calib;
+    const scale = (box.clientWidth / img.w) * zoom;      // ซูม 1 = พอดีความกว้างกล่อง
+    im.style.width = img.w * scale + 'px'; im.style.height = img.h * scale + 'px';
+    im.src = img.dataUrl;
+    ch.style.width = im.style.width; cv.style.height = im.style.height;
+    pts.forEach((p, i) => {
+      const m = document.createElement('div');
+      m.className = 'calib-pt'; m.textContent = i ? 'B' : 'A';
+      m.style.left = p.x * scale + 'px'; m.style.top = p.y * scale + 'px';
+      box.appendChild(m);
+    });
+    box.scrollLeft = sl; box.scrollTop = st;
+    box.onmousemove = e => {
+      const r = im.getBoundingClientRect();
+      ch.style.display = cv.style.display = 'block';
+      ch.style.top = (e.clientY - r.top) + 'px'; cv.style.left = (e.clientX - r.left) + 'px';
+    };
+    box.onmouseleave = () => { ch.style.display = cv.style.display = 'none'; };
+    box.onclick = e => {
+      const r = im.getBoundingClientRect();
+      const x = (e.clientX - r.left) * img.w / r.width, y = (e.clientY - r.top) * img.h / r.height;
+      if (x < 0 || y < 0 || x > img.w || y > img.h) return;
+      calib.pts[calib.step - 1] = { x, y };
+      setStatus(`บันทึกจุด ${calib.step === 1 ? 'A' : 'B'} แล้ว (pixel ${x.toFixed(0)}, ${y.toFixed(0)})`);
+      calib.step++;
+      renderCalib();
+    };
+  }
+  function finishCalib() {
+    const d = parseFloat($('calibDist').value);
+    if (!(d > 0)) { warn('กรุณากรอกระยะทางจริงที่มากกว่า 0'); return; }
+    const [a, b] = calib.pts, px = Math.hypot(b.x - a.x, b.y - a.y);
+    if (px < 1) { warn('จุด A และ B อยู่ใกล้กันเกินไป กรุณาเลือกใหม่'); return; }
+    const mpp = d / px, c = map.getCenter();
+    // เมตร/พิกเซลภาพ → พิกเซลหน้าจอ/พิกเซลภาพ ที่ zoom อ้างอิง (ปรับตามละติจูด Mercator)
+    const baseScale = mpp * 2 ** CALIB_ZOOM / (MERC * Math.cos(rad(c.lat)));
+    const { dataUrl, w, h } = calib.img;
+    calib = null; renderCalib();
+    setOverlay({ dataUrl, w, h, lat: c.lat, lng: c.lng, baseScale, mult: 1, calibZoom: CALIB_ZOOM, rot: 0, opacity: 0.7 });
+    setAdjust(true);
+    setStatus(`สเกล ${mpp.toFixed(4)} ม./พิกเซล — ภาพอยู่กลางจอ ลากไปวางตำแหน่งจริงแล้วปรับหมุน/สเกลละเอียด`);
+  }
+
+  async function removeOverlay() {
+    if (!(await ask('ต้องการลบภาพ Overlay ใช่หรือไม่?'))) return;
+    if (adjustMode) setAdjust(false);
+    removeOverlayEl(); overlay = null; syncOverlayUI();
+    setStatus('ลบภาพ Overlay แล้ว');
+  }
+  function exportCalib() {
+    if (!overlay) { warn('ยังไม่มี Overlay ให้ export'); return; }
+    downloadFile(JSON.stringify({ type: 'drone_overlay_calibration', version: 2, overlay }), 'overlay_calibration.json', 'application/json');
+    setStatus('Export Overlay Calibration สำเร็จ');
+  }
+  async function importCalib(file) {
+    const data = JSON.parse(await file.text());
+    if (!validOverlay(data.overlay)) throw new Error('ไฟล์ไม่ใช่ Overlay Calibration ที่ถูกต้อง');
+    setOverlay(cleanOverlay(data.overlay));
+    map.setView([overlay.lat, overlay.lng], Math.max(map.getZoom(), 16));
+    setStatus('นำเข้า Overlay Calibration สำเร็จ');
+  }
+
+  /* ================= Area measurement ================= */
+  function toggleMeasure() {
+    measureMode = !measureMode;
+    setToggle($('measureBtn'), measureMode, '⏹ หยุดวัด', '📐 เริ่มวัด', 'secondary');
+    setStatus(measureMode ? 'โหมดวัดพื้นที่: คลิกบนแผนที่เพื่อวาดขอบเขต (อย่างน้อย 3 จุด)' : 'ปิดโหมดวัดพื้นที่แล้ว');
+  }
+  function addMeasure(lat, lng) {
+    mPts.push({ lat, lng });
+    mMarkers.push(L.circleMarker([lat, lng], { radius: 5, color: '#facc15', fillColor: '#facc15', fillOpacity: 1, weight: 2, interactive: false }).addTo(map));
+    redrawMeasure();
+  }
+  function redrawMeasure() {
+    if (mShape) { mShape.remove(); mShape = null; }
+    const ll = mPts.map(p => [p.lat, p.lng]);
+    const style = { color: '#facc15', weight: 2, dashArray: '5,5', interactive: false };
+    if (ll.length >= 3) mShape = L.polygon(ll, { ...style, fillColor: '#facc15', fillOpacity: 0.2 }).addTo(map);
+    else if (ll.length === 2) mShape = L.polyline(ll, style).addTo(map);
+    updateMeasureInfo();
+  }
+  function updateMeasureInfo() {
+    const n = mPts.length;
+    $('measureBox').hidden = n === 0;
+    if (!n) return;
+    $('mCount').textContent = n;
+    let per = 0;
+    for (let i = 0; i < (n >= 3 ? n : n - 1); i++) {
+      const a = mPts[i], b = mPts[(i + 1) % n];
+      per += haversine(a.lat, a.lng, b.lat, b.lng);
+    }
+    $('mPerim').textContent = fmtDist(per);
+    if (n >= 3) {
+      const zone = toUTM(mPts[0].lat, mPts[0].lng).zone;      // ใช้โซนเดียวกันทุกจุด
+      const area = polygonArea(mPts.map(p => toUTM(p.lat, p.lng, zone)));
+      const r = toRaiNganWah(area);
+      $('mArea').textContent = area.toFixed(2) + ' ตร.ม.';
+      $('mRai').textContent = `${r.rai} ไร่ ${r.ngan} งาน ${r.wah.toFixed(2)} ตร.วา`;
+    } else { $('mArea').textContent = '- (ต้องมี ≥ 3 จุด)'; $('mRai').textContent = '-'; }
+  }
+  function undoMeasure() {
+    if (!mPts.length) return;
+    mPts.pop(); mMarkers.pop()?.remove();
+    redrawMeasure();
+  }
+  function clearMeasure() {
+    mPts = []; mMarkers.forEach(m => m.remove()); mMarkers = [];
+    redrawMeasure();
+    setStatus('ล้างการวัดพื้นที่แล้ว');
+  }
+
+  /* ================= Import / Export ================= */
+  async function importKML(file) {
+    const doc = new DOMParser().parseFromString(await file.text(), 'text/xml');
+    if (doc.querySelector('parsererror')) throw new Error('ไฟล์ KML ไม่ถูกต้อง');
+    const defAlt = num($('defAlt').value, 50), pts = [];
+    for (const node of doc.getElementsByTagName('coordinates')) {
+      for (const tok of node.textContent.trim().split(/\s+/)) {
+        const [lng, lat, alt] = tok.split(',').map(parseFloat);
+        if (validLL(lat, lng)) pts.push({ lat, lng, altitude: alt > 0 ? alt : defAlt });
+      }
+    }
+    if (!pts.length) { warn('ไม่พบพิกัดในไฟล์ KML นี้'); return; }
+    if (waypoints.length && !(await ask('การนำเข้า KML จะแทนที่ waypoint ปัจจุบันทั้งหมด ต้องการดำเนินการต่อหรือไม่?'))) return;
+    const used = pts.slice(0, MAX_IMPORT);
+    waypoints = used.map(makeWP); targetIdx = null;
+    redraw();
+    map.fitBounds(L.latLngBounds(used.map(p => [p.lat, p.lng])), { maxZoom: 17, padding: [30, 30] });
+    setStatus(`นำเข้า KML สำเร็จ ${used.length} จุด` + (pts.length > MAX_IMPORT ? ` (จำกัด ${MAX_IMPORT} จุดแรก)` : ''));
+  }
+
+  function exportLitchi() {
+    if (!waypoints.length) { warn('กรุณาเพิ่ม waypoint ก่อน export'); return; }
+    const speed = Math.max(0.1, num($('defSpeed').value, 5));
+    const head = ['latitude', 'longitude', 'altitude(m)', 'heading(deg)', 'curvesize(m)', 'rotationdir', 'gimbalmode', 'gimbalpitchangle'];
+    for (let i = 1; i <= 15; i++) head.push('actiontype' + i, 'actionparam' + i);
+    head.push('altitudemode', 'speed(m/s)', 'poi_latitude', 'poi_longitude', 'poi_altitude(m)', 'poi_altitudemode', 'photo_timeinterval', 'photo_distinterval');
+
+    const rows = [head.join(',')];
+    waypoints.forEach(wp => {
+      const acts = [];                                      // [type, param]: 0=หยุด(ms), 1=ถ่ายภาพ, -1=ว่าง
+      if (wp.waitForCommand) acts.push([0, 999000]);        // Litchi ไม่มีคำสั่ง "รอ" จริง จึงหยุดนานแทน
+      else if (wp.hold > 0) acts.push([0, Math.round(wp.hold * 1000)]);
+      if (wp.action === 'photo') acts.push([1, 0]);
+      while (acts.length < 15) acts.push([-1, 0]);
+      rows.push([
+        wp.lat.toFixed(7), wp.lng.toFixed(7), wp.altitude, ((wp.heading % 360) + 360) % 360, 0, 0, 0, 0,
+        ...acts.flat(), 1, speed, 0, 0, 0, 0, -1, -1
+      ].join(','));
+    });
+    downloadFile(rows.join('\n'), 'litchi_mission.csv', 'text/csv');
+    const skipped = waypoints.filter(w => w.action === 'release').length;
+    let msg = 'Export Litchi CSV สำเร็จ';
+    if (waypoints.length > 99) msg += ' ⚠️ Litchi รองรับสูงสุด 99 จุดต่อภารกิจ';
+    if (skipped) msg += ` (ข้าม action "ปล่อยของ" ${skipped} จุด เพราะ Litchi ไม่รองรับ)`;
+    (waypoints.length > 99 || skipped ? warn : setStatus)(msg);
+  }
+
+  function exportKML() {
+    if (!waypoints.length) { warn('กรุณาเพิ่ม waypoint ก่อน export'); return; }
+    const pm = waypoints.map((w, i) => `
+    <Placemark><name>Point ${i + 1}</name>
+      <description>Altitude: ${w.altitude}m | Hold: ${w.hold}s | Heading: ${w.heading} | Action: ${w.action}</description>
+      <Point><altitudeMode>relativeToGround</altitudeMode><coordinates>${w.lng},${w.lat},${w.altitude}</coordinates></Point></Placemark>`).join('');
+    const line = waypoints.map(w => `${w.lng},${w.lat},${w.altitude}`).join(' ');
+    downloadFile(`<?xml version="1.0" encoding="UTF-8"?>
+<kml xmlns="http://www.opengis.net/kml/2.2"><Document><name>Drone Mission Waypoints</name>${pm}
+    <Placemark><name>Flight Path</name><LineString><altitudeMode>relativeToGround</altitudeMode><coordinates>${line}</coordinates></LineString></Placemark>
+</Document></kml>`, 'mission.kml', 'application/vnd.google-earth.kml+xml');
+    setStatus('Export KML สำเร็จ');
+  }
+
+  /** โปรเจกต์ = waypoint + track + overlay ในไฟล์ JSON เดียว (แทนการบันทึกในเบราว์เซอร์) */
+  function saveProject() {
+    if (!waypoints.length && !track.length && !overlay) { warn('ยังไม่มีข้อมูลให้บันทึก'); return; }
+    downloadFile(JSON.stringify({
+      type: PROJECT_TYPE, version: 2, savedAt: new Date().toISOString(),
+      defaults: { altitude: num($('defAlt').value, 50), speed: num($('defSpeed').value, 5) },
+      waypoints: waypoints.map(({ lat, lng, altitude, hold, heading, waitForCommand, action }) => ({ lat, lng, altitude, hold, heading, waitForCommand, action })),
+      track, overlay
+    }), 'drone_project.json', 'application/json');
+    setStatus('บันทึกโปรเจกต์เป็นไฟล์ JSON สำเร็จ');
+  }
+  async function openProject(file) {
+    const d = JSON.parse(await file.text());
+    if (d.type !== PROJECT_TYPE) throw new Error('ไม่ใช่ไฟล์โปรเจกต์ของโปรแกรมนี้');
+    if ((waypoints.length || track.length || overlay) && !(await ask('การเปิดโปรเจกต์จะแทนที่ข้อมูลปัจจุบันทั้งหมด ต้องการดำเนินการต่อหรือไม่?'))) return;
+    if (recording) stopRecord();
+    waypoints = (Array.isArray(d.waypoints) ? d.waypoints : []).filter(w => w && validLL(w.lat, w.lng)).map(makeWP);
+    targetIdx = null;
+    setTrack((Array.isArray(d.track) ? d.track : []).filter(p => p && validLL(p.lat, p.lng))
+      .map(p => ({ lat: p.lat, lng: p.lng, t: num(p.t, Date.now()), alt: p.alt ?? null, spd: p.spd ?? null })));
+    if (validOverlay(d.overlay)) setOverlay(cleanOverlay(d.overlay));
+    else { if (adjustMode) setAdjust(false); removeOverlayEl(); overlay = null; syncOverlayUI(); }
+    if (d.defaults) { $('defAlt').value = num(d.defaults.altitude, 50); $('defSpeed').value = num(d.defaults.speed, 5); }
+    redraw();
+    const pts = [...waypoints, ...track].map(p => [p.lat, p.lng]);
+    if (pts.length) map.fitBounds(L.latLngBounds(pts), { maxZoom: 17, padding: [30, 30] });
+    setStatus(`เปิดโปรเจกต์สำเร็จ (${waypoints.length} จุด, Track ${track.length} จุด)`);
+  }
+
+  /* ================= Event wiring ================= */
+  const H = {
+    locate: locateMe,
+    toggleTrack: () => tracking ? stopTracking() : startTracking(),
+    toggleRecord, compass: enableCompass,
+    toggleAdd: () => setAddMode(!addMode),
+    pickKml: () => $('kmlInput').click(),
+    pickProject: () => $('projectInput').click(),
+    exportLitchi, exportKml: exportKML, saveProject,
+    clearAll: async () => {
+      if (!waypoints.length || !(await ask('ต้องการล้างจุด waypoint ทั้งหมดใช่หรือไม่?'))) return;
+      waypoints = []; targetIdx = null; redraw(); setStatus('ล้างจุดทั้งหมดแล้ว');
+    },
+    pickOverlay: () => $('overlayInput').click(),
+    pickCalib: () => $('calibInput').click(),
+    exportCalib,
+    calibStart: () => { if (overlay) startCalib({ dataUrl: overlay.dataUrl, w: overlay.w, h: overlay.h }); },
+    toggleAdjust: () => setAdjust(!adjustMode),
+    rot: b => { if (!overlay) return; overlay.rot += rad(+b.dataset.d); syncOverlayUI(); positionOverlay(); },
+    scale: b => { if (!overlay) return; overlay.mult = Math.max(0.05, overlay.mult + +b.dataset.d); syncOverlayUI(); positionOverlay(); },
+    nudge: b => {
+      if (!overlay) return;
+      const p = map.latLngToLayerPoint([overlay.lat, overlay.lng]);
+      const ll = map.layerPointToLatLng([p.x + +b.dataset.dx, p.y + +b.dataset.dy]);
+      overlay.lat = ll.lat; overlay.lng = ll.lng; positionOverlay();
+    },
+    removeOverlay,
+    calibZoom: b => { calib.zoom = Math.min(5, Math.max(0.2, calib.zoom + +b.dataset.d)); renderCalib(); },
+    calibBack: () => { calib.step = Math.max(1, calib.step - 1); renderCalib(); },
+    calibCancel: async () => { if (await ask('ต้องการยกเลิกการคาลิเบรทใช่หรือไม่?')) { calib = null; renderCalib(); setStatus('ยกเลิกการคาลิเบรทแล้ว'); } },
+    calibOk: finishCalib,
+    measureToggle: toggleMeasure, measureUndo: undoMeasure, measureClear: clearMeasure,
+    alertToggle: toggleAlert,
+    trackKml: exportTrackKML, trackCsv: exportTrackCSV,
+    trackClear: async () => {
+      if (!track.length || !(await ask('ต้องการล้าง Track Log ทั้งหมดใช่หรือไม่?'))) return;
+      if (recording) stopRecord();
+      setTrack([]); setStatus('ล้าง Track Log แล้ว');
+    },
+    navCancel: () => { targetIdx = null; redraw(); },
+    wpGoto: b => gotoWP(wpIndex(b)),
+    wpUp: b => moveWP(wpIndex(b), -1),
+    wpDown: b => moveWP(wpIndex(b), 1),
+    wpDel: b => removeWP(wpIndex(b))
+  };
+  // ใช้ event delegation: ปุ่มทุกตัวระบุ data-act (ไม่ใช้ inline onclick จึงไม่ต้องเปิด global)
+  document.addEventListener('click', e => {
+    const b = e.target.closest('[data-act]');
+    if (b && Object.hasOwn(H, b.dataset.act)) H[b.dataset.act](b);
+  });
+
+  map.on('click', e => {
+    if (calib || adjustMode) return;       // กันคลิกค้างหลังลากภาพ/ระหว่างคาลิเบรท
+    if (measureMode) addMeasure(e.latlng.lat, e.latlng.lng);
+    else if (addMode) addWaypoint(e.latlng.lat, e.latlng.lng);
+  });
+
+  onPick($('kmlInput'), importKML);
+  onPick($('projectInput'), openProject);
+  onPick($('overlayInput'), uploadOverlay);
+  onPick($('calibInput'), importCalib);
+
+  $('ovOpacity').addEventListener('input', e => {
+    if (!overlay) return;
+    overlay.opacity = e.target.value / 100;
+    $('ovOpacityLabel').textContent = e.target.value + '%';
+    if (overlayEl) overlayEl.style.opacity = overlay.opacity;
+  });
+  $('ovRot').addEventListener('change', e => {
+    if (!overlay) return;
+    overlay.rot = rad(num(e.target.value));
+    positionOverlay();
+  });
+
+  /* ================= Init ================= */
+  setAddMode(true);
+  redraw();
+  renderTrackInfo();
+  updateMeasureInfo();
+  syncOverlayUI();
+  setTimeout(() => map.invalidateSize(), 200);
+});
+})();
+</script>
+</body>
+</html>
